@@ -15,7 +15,11 @@ create extension if not exists pgcrypto;
 create table if not exists public.suppliers (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
-  contact text,
+  contact text,                          -- contact person's name
+  phone text,
+  email text,
+  address text,
+  products_supplied text,                -- free text list of products/services supplied
   notes text,
   created_at timestamptz not null default now()
 );
@@ -59,12 +63,15 @@ create table if not exists public.projects (
     check (status in ('Not Started','In Progress','On Hold','Delayed / At Risk','Awaiting Material','Completed / Handed Over')),
   notes text,                            -- latest remarks / free text
   -- Additive fields present in the latest tracker (mostly project-level, not yet itemised):
-  design_signoff_date date,
+  design_signoff_date date,              -- also shown/edited in the app as "Design Approved Date"
   order_date date,
   requested_delivery_date date,
   primary_supplier text,
   lpo_ref text,
   work_order_no text,
+  approved_ral_color text,               -- e.g. "RAL 9016M"
+  contact_name text,                     -- site contact name
+  contact_phone text,                    -- site contact phone
   is_closed boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

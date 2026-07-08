@@ -9,9 +9,13 @@ insert into public.categories (name, sort_order) values
   ('Doors', 1),
   ('Windows', 2),
   ('Facades & Partitions', 3),
-  ('Glass & Film', 4),
-  ('Insect Screens', 5),
-  ('Railings & Other', 6)
+  ('Glass', 4),
+  ('Film', 5),
+  ('SSF Film', 6),
+  ('Tinted Film', 7),
+  ('Frosted Film', 8),
+  ('Insect Screens', 9),
+  ('Railings & Other', 10)
 on conflict (name) do nothing;
 
 insert into public.units_of_measure (name, sort_order) values
