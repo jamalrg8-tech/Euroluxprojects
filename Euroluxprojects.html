@@ -409,8 +409,16 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
     <div class="modal-body">
       <div class="form-grid form-grid-2">
         <div class="form-group full"><label>Item / Description *</label><input type="text" id="if-desc" /></div>
-        <div class="form-group"><label>Category</label><select id="if-category"></select></div>
+        <div class="form-group"><label>Category</label><select id="if-category" onchange="onItemCategoryChange()"></select></div>
         <div class="form-group"><label>Supplier</label><select id="if-supplier"></select></div>
+        <div class="form-group" id="if-sorex-wrap" style="display:none;">
+          <label>SOREX Required</label>
+          <select id="if-sorex"><option value="">&mdash;</option><option>Yes</option><option>No</option></select>
+        </div>
+        <div class="form-group" id="if-winhaus-wrap" style="display:none;">
+          <label>WINHAUS Lock Position</label>
+          <select id="if-winhaus"><option value="">&mdash;</option><option>LEFT</option><option>RIGHT</option></select>
+        </div>
         <div class="form-group"><label>Quantity</label><input type="number" id="if-qty" value="1" step="0.01" /></div>
         <div class="form-group"><label>Unit of Measure</label><input type="text" id="if-uom" list="uom-list" /></div>
         <div class="form-group"><label>Cost per Unit (AED)</label><input type="number" id="if-unit-cost" step="0.01" /></div>
@@ -543,6 +551,8 @@ var sb = null;
 var cache = { suppliers: [], categories: [], contractors: [], units: [], glassTypes: [], glazingTypes: [] };
 var SYSTEM_OPTIONS = ['Schuco', 'Vetromax', 'Rabel', 'Fusion', 'RENSON', 'Freedom', 'Bettio', 'Alumil', 'Origin', 'EFP', 'Gulf Extrusion', 'Decomaster'];
 var DELAY_RISK_OPTIONS = ['On Target', 'Potential Delay Risk', 'Low Risk Glass & Frames', 'High Delay Risk Frames', 'High Delay Risk Glass', 'High Risk Glass & Frames', 'High Risk Front Door'];
+// Categories that require the SOREX / WINHAUS lock-position fields on a procurement item.
+var SOREX_WINHAUS_CATEGORIES = ['SCHUCO Entrance Door HINGED', 'SCHUCO Entrance Door PIVOT', 'THIRAL PIVOT Door', 'THIRAL Hinged Door'];
 var currentProjectId = null;
 var navStack = []; // {name, arg} entries — powers the generic Back button
 var _isBackNav = false;
@@ -1233,6 +1243,8 @@ function renderProjectDetail(project, items) {
               '<div class="detail-item"><div class="k">PO Reference</div><div class="v">' + (esc(i.po_ref) || '&mdash;') + '</div></div>' +
               '<div class="detail-item"><div class="k">Approved Glass</div><div class="v">' + (esc(i.approved_glass) || '&mdash;') + '</div></div>' +
               '<div class="detail-item"><div class="k">Glazing Type</div><div class="v">' + (esc(i.glazing_type) || '&mdash;') + '</div></div>' +
+              (i.sorex_required ? '<div class="detail-item"><div class="k">SOREX Required</div><div class="v">' + esc(i.sorex_required) + '</div></div>' : '') +
+              (i.winhaus_lock_position ? '<div class="detail-item"><div class="k">WINHAUS Lock Position</div><div class="v">' + esc(i.winhaus_lock_position) + '</div></div>' : '') +
             '</div>' +
             (i.notes ? '<div style="margin-top:10px;"><div class="detail-item k">Notes</div><div style="margin-top:4px;white-space:pre-wrap;font-size:0.82rem;">' + nl2br(i.notes) + '</div></div>' : '') +
           '</div>';
@@ -1285,7 +1297,7 @@ function exportItemsCSV() {
   downloadCSV('items-' + (window.currentProjectData ? (window.currentProjectData.ref || window.currentProjectData.site_name) : 'project') + '.csv', currentProjectItems.map(function (i) {
     var cat = cache.categories.filter(function (c) { return c.id === i.category_id; })[0];
     var sup = cache.suppliers.filter(function (s) { return s.id === i.supplier_id; })[0];
-    return { Description: i.description, Category: cat ? cat.name : '', Supplier: sup ? sup.name : '', Qty: i.qty, UOM: i.uom, UnitCost: i.unit_cost, TotalCost: i.total_cost, PurchaseDate: i.purchase_date, LeadTimeDays: i.lead_time_days, RequiredDelivery: i.required_delivery, ActualDelivery: i.actual_delivery, PORef: i.po_ref, ApprovedGlass: i.approved_glass, GlazingType: i.glazing_type, Status: i.item_status };
+    return { Description: i.description, Category: cat ? cat.name : '', Supplier: sup ? sup.name : '', Qty: i.qty, UOM: i.uom, UnitCost: i.unit_cost, TotalCost: i.total_cost, PurchaseDate: i.purchase_date, LeadTimeDays: i.lead_time_days, RequiredDelivery: i.required_delivery, ActualDelivery: i.actual_delivery, PORef: i.po_ref, ApprovedGlass: i.approved_glass, GlazingType: i.glazing_type, SorexRequired: i.sorex_required, WinhausLockPosition: i.winhaus_lock_position, Status: i.item_status };
   }));
 }
 
@@ -1417,12 +1429,26 @@ function openItemForm(item, mode) {
   document.getElementById('if-glazing').value = isEdit ? (item.glazing_type || '') : '';
   document.getElementById('glazing-list').innerHTML = cache.glazingTypes.map(function (g) { return '<option value="' + esc(g.name) + '">'; }).join('');
   document.getElementById('if-notes').value = isEdit ? (item.notes || '') : '';
+  document.getElementById('if-sorex').value = isEdit ? (item.sorex_required || '') : '';
+  document.getElementById('if-winhaus').value = isEdit ? (item.winhaus_lock_position || '') : '';
   editingItemId = isEdit ? item.id : null;
+  onItemCategoryChange();
   setItemFormReadOnly(mode === 'view');
   document.getElementById('item-modal').classList.add('open');
 }
+function onItemCategoryChange() {
+  var sel = document.getElementById('if-category');
+  var catName = sel.selectedOptions && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : '';
+  var show = SOREX_WINHAUS_CATEGORIES.indexOf(catName) !== -1;
+  document.getElementById('if-sorex-wrap').style.display = show ? '' : 'none';
+  document.getElementById('if-winhaus-wrap').style.display = show ? '' : 'none';
+  if (!show) {
+    document.getElementById('if-sorex').value = '';
+    document.getElementById('if-winhaus').value = '';
+  }
+}
 function setItemFormReadOnly(readOnly) {
-  ['if-desc', 'if-category', 'if-supplier', 'if-qty', 'if-uom', 'if-unit-cost', 'if-status', 'if-purchase-date', 'if-lead-time', 'if-required-delivery', 'if-actual-delivery', 'if-po-ref', 'if-glass', 'if-glazing', 'if-notes'].forEach(function (id) {
+  ['if-desc', 'if-category', 'if-supplier', 'if-qty', 'if-uom', 'if-unit-cost', 'if-status', 'if-purchase-date', 'if-lead-time', 'if-required-delivery', 'if-actual-delivery', 'if-po-ref', 'if-glass', 'if-glazing', 'if-notes', 'if-sorex', 'if-winhaus'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.disabled = readOnly;
   });
@@ -1440,6 +1466,9 @@ function closeItemForm() { document.getElementById('item-modal').classList.remov
 function saveItem() {
   var desc = document.getElementById('if-desc').value.trim();
   if (!desc) { toast('Description is required', 'error'); return; }
+  var catSel = document.getElementById('if-category');
+  var catName = catSel.selectedOptions && catSel.selectedOptions[0] ? catSel.selectedOptions[0].textContent : '';
+  var needsSorexWinhaus = SOREX_WINHAUS_CATEGORIES.indexOf(catName) !== -1;
   var payload = {
     description: desc,
     category_id: document.getElementById('if-category').value || null,
@@ -1455,7 +1484,9 @@ function saveItem() {
     po_ref: document.getElementById('if-po-ref').value.trim() || null,
     approved_glass: document.getElementById('if-glass').value.trim() || null,
     glazing_type: document.getElementById('if-glazing').value.trim() || null,
-    notes: document.getElementById('if-notes').value.trim() || null
+    notes: document.getElementById('if-notes').value.trim() || null,
+    sorex_required: needsSorexWinhaus ? (document.getElementById('if-sorex').value || null) : null,
+    winhaus_lock_position: needsSorexWinhaus ? (document.getElementById('if-winhaus').value || null) : null
   };
   var isEdit = !!editingItemId;
   var p;
