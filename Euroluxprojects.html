@@ -346,7 +346,6 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
         <div class="form-group"><label>Design Approved Date</label><input type="date" id="pf-design-date" onchange="onDesignDateChange()" /></div>
         <div class="form-group"><label>Site Contact Name</label><input type="text" id="pf-contact-name" /></div>
         <div class="form-group"><label>Site Contact Phone</label><input type="tel" id="pf-contact-phone" placeholder="+971 50 000 0000" /></div>
-        <div class="form-group"><label>Installation Team</label><input type="text" id="pf-install-team" list="install-team-list" placeholder="e.g. Team A" /></div>
       </div>
       <div class="form-group full" style="margin-top:1rem;">
         <label>Systems</label>
@@ -387,7 +386,6 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
       <div class="form-group full" style="margin-top:0.75rem;"><label>Project Notes</label><textarea id="pf-notes" placeholder="General notes / remarks about this project"></textarea></div>
       <datalist id="contractor-list"></datalist>
       <datalist id="pf-glass-list"></datalist>
-      <datalist id="install-team-list"></datalist>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" id="pf-delete-btn" onclick="deleteProjectFromForm()" style="margin-right:auto;color:#c00;display:none;">&#128465; Delete</button>
@@ -581,7 +579,7 @@ var currentProjectItems = [];
 var projectsFilter = { search: '', status: '', contractor: '', delayRisk: '' };
 var deliveriesFilter = { from: todayISO(), to: '', supplier: '', category: '', onlyPending: true };
 var reportsTab = 'spend';
-var projectReportFilter = { statuses: [], installFrom: '', installTo: '', designFrom: '', designTo: '', teams: [] };
+var projectReportFilter = { statuses: [], installFrom: '', installTo: '', designFrom: '', designTo: '' };
 var _reportsItemsCache = [];
 var _reportsProjectsCache = [];
 var editingRef = { table: null, id: null };
@@ -747,13 +745,6 @@ function listProjects() {
     _allProjectsCache = r.data || [];
     return _allProjectsCache;
   });
-}
-function distinctInstallationTeams() {
-  return _allProjectsCache
-    .map(function (p) { return (p.installation_team || '').trim(); })
-    .filter(Boolean)
-    .reduce(function (acc, v) { if (acc.indexOf(v) === -1) acc.push(v); return acc; }, [])
-    .sort();
 }
 function getProject(id) {
   return sb.from('projects').select('*').eq('id', id).single().then(function (r) {
@@ -1104,7 +1095,7 @@ function applyProjectFilters(projects) {
 
 function buildProjectsRowsHtml(filtered) {
   return filtered.length ? (
-    '<table class="quotes-list"><thead><tr><th>Ref</th><th>Site / Project</th><th>Contractor</th><th>Status</th><th>Risk</th><th>Systems</th><th>Install Team</th><th>Install Date</th><th class="r">Value</th></tr></thead><tbody>' +
+    '<table class="quotes-list"><thead><tr><th>Ref</th><th>Site / Project</th><th>Contractor</th><th>Status</th><th>Risk</th><th>Systems</th><th>Install Date</th><th class="r">Value</th></tr></thead><tbody>' +
     filtered.map(function (p) {
       return '<tr onclick="showProjectDetail(\'' + p.id + '\')">' +
         '<td class="muted">' + (esc(p.ref) || '&mdash;') + '</td>' +
@@ -1113,7 +1104,6 @@ function buildProjectsRowsHtml(filtered) {
         '<td>' + statusBadge(p.status) + '</td>' +
         '<td>' + statusBadge(p.delay_risk_status) + '</td>' +
         '<td class="muted">' + (esc((p.systems || []).join(', ')) || '&mdash;') + '</td>' +
-        '<td class="muted">' + (esc(p.installation_team) || '&mdash;') + '</td>' +
         '<td class="muted">' + fmtDate(p.install_date) + '</td>' +
         '<td class="r">' + (p.project_value ? fmt(p.project_value) : '&mdash;') + '</td>' +
         '</tr>';
@@ -1172,7 +1162,7 @@ function clearProjectFilters() {
 function exportProjectsCSV() {
   var filtered = applyProjectFilters(_allProjectsCache);
   downloadCSV('eurolux-projects.csv', filtered.map(function (p) {
-    return { Ref: p.ref, Site: p.site_name, Contractor: p.main_contractor, Client: p.client, Status: p.status, DelayRiskStatus: p.delay_risk_status, RiskMitigationNotes: p.risk_mitigation_notes, Systems: (p.systems || []).join('; '), InstallationTeam: p.installation_team, InstallDate: p.install_date, FinishDate: p.finish_date, ProjectValueAED: p.project_value, ApprovedRALColor: p.approved_ral_color, ApprovedGlass: p.approved_glass, DesignApprovedDate: p.design_signoff_date, ContactName: p.contact_name, ContactPhone: p.contact_phone, CADTechnician: p.cad_technician, PlannedDrawingSubmissionDate: p.planned_drawing_submission_date, RevisedDrawingSubmissionDate: p.revised_drawing_submission_date, DrawingSubmissionNotes: p.drawing_submission_notes };
+    return { Ref: p.ref, Site: p.site_name, Contractor: p.main_contractor, Client: p.client, Status: p.status, DelayRiskStatus: p.delay_risk_status, RiskMitigationNotes: p.risk_mitigation_notes, Systems: (p.systems || []).join('; '), InstallDate: p.install_date, FinishDate: p.finish_date, ProjectValueAED: p.project_value, ApprovedRALColor: p.approved_ral_color, ApprovedGlass: p.approved_glass, DesignApprovedDate: p.design_signoff_date, ContactName: p.contact_name, ContactPhone: p.contact_phone, CADTechnician: p.cad_technician, PlannedDrawingSubmissionDate: p.planned_drawing_submission_date, RevisedDrawingSubmissionDate: p.revised_drawing_submission_date, DrawingSubmissionNotes: p.drawing_submission_notes };
   }));
 }
 
@@ -1275,7 +1265,6 @@ function renderProjectDetail(project, items) {
         '<div class="detail-item"><div class="k">Design Approved Date</div><div class="v">' + fmtDate(project.design_signoff_date) + '</div></div>' +
         '<div class="detail-item"><div class="k">Site Contact Name</div><div class="v">' + (esc(project.contact_name) || '&mdash;') + '</div></div>' +
         '<div class="detail-item"><div class="k">Site Contact Phone</div><div class="v">' + (esc(project.contact_phone) || '&mdash;') + '</div></div>' +
-        '<div class="detail-item"><div class="k">Installation Team</div><div class="v">' + (esc(project.installation_team) || '&mdash;') + '</div></div>' +
         '<div class="detail-item"><div class="k">Systems</div><div class="v">' + (esc((project.systems || []).join(', ')) || '&mdash;') + '</div></div>' +
         '<div class="detail-item"><div class="k">CAD Technician</div><div class="v">' + (esc(project.cad_technician) || '&mdash;') + '</div></div>' +
         '<div class="detail-item"><div class="k">Planned Drawing Submission Date</div><div class="v">' + fmtDate(project.planned_drawing_submission_date) + '</div></div>' +
@@ -1328,8 +1317,6 @@ function openProjectForm(project) {
   document.getElementById('pf-design-date').value = isEdit ? (project.design_signoff_date || '') : '';
   document.getElementById('pf-contact-name').value = isEdit ? (project.contact_name || '') : '';
   document.getElementById('pf-contact-phone').value = isEdit ? (project.contact_phone || '') : '';
-  document.getElementById('pf-install-team').value = isEdit ? (project.installation_team || '') : '';
-  document.getElementById('install-team-list').innerHTML = distinctInstallationTeams().map(function (t) { return '<option value="' + esc(t) + '">'; }).join('');
   document.getElementById('pf-scope').value = isEdit ? (project.scope_text || '') : '';
   document.getElementById('pf-notes').value = isEdit ? (project.notes || '') : '';
   document.getElementById('pf-install-hint').textContent = '';
@@ -1363,7 +1350,6 @@ function saveProject() {
     design_signoff_date: document.getElementById('pf-design-date').value || null,
     contact_name: document.getElementById('pf-contact-name').value.trim() || null,
     contact_phone: document.getElementById('pf-contact-phone').value.trim() || null,
-    installation_team: document.getElementById('pf-install-team').value.trim() || null,
     systems: Array.prototype.filter.call(document.querySelectorAll('.pf-system-cb'), function (cb) { return cb.checked; }).map(function (cb) { return cb.value; }),
     scope_text: document.getElementById('pf-scope').value.trim() || null,
     notes: document.getElementById('pf-notes').value.trim() || null,
@@ -1656,7 +1642,6 @@ function applyProjectReportFilters(projects) {
     if (projectReportFilter.installTo && (!p.install_date || p.install_date > projectReportFilter.installTo)) return false;
     if (projectReportFilter.designFrom && (!p.design_signoff_date || p.design_signoff_date < projectReportFilter.designFrom)) return false;
     if (projectReportFilter.designTo && (!p.design_signoff_date || p.design_signoff_date > projectReportFilter.designTo)) return false;
-    if (projectReportFilter.teams.length && projectReportFilter.teams.indexOf(p.installation_team || '') === -1) return false;
     return true;
   });
 }
@@ -1695,12 +1680,6 @@ function checkboxFilterGrid(cssClass, options, selected) {
 }
 function renderProjectListReport(allProjects) {
   var filtered = applyProjectReportFilters(allProjects);
-  var teams = allProjects
-    .map(function (p) { return (p.installation_team || '').trim(); })
-    .filter(Boolean)
-    .reduce(function (acc, v) { if (acc.indexOf(v) === -1) acc.push(v); return acc; }, [])
-    .sort();
-
   var rowsHtml = filtered.length ? (
     '<table class="quotes-list"><thead><tr>' +
       PROJECT_REPORT_COLUMNS.map(function (c) { return '<th' + (c === 'Project Value' ? ' class="r"' : '') + '>' + c + '</th>'; }).join('') +
@@ -1730,7 +1709,6 @@ function renderProjectListReport(allProjects) {
         '<div class="form-group"><label>Design Approved Date To</label><input type="date" class="date-filter" id="pr-design-to" value="' + esc(projectReportFilter.designTo) + '" onchange="onProjectReportFilterChange()" /></div>' +
       '</div>' +
       '<div class="form-group full" style="margin-top:0.9rem;"><label>Project Status (select one or more)</label>' + checkboxFilterGrid('pr-status-cb', PROJECT_STATUSES, projectReportFilter.statuses) + '</div>' +
-      '<div class="form-group full" style="margin-top:0.9rem;"><label>Installation Team (select one or more)</label>' + checkboxFilterGrid('pr-team-cb', teams, projectReportFilter.teams) + '</div>' +
       '<div style="text-align:right;margin-top:1rem;"><button class="btn btn-ghost btn-sm" onclick="clearProjectReportFilters()">Clear Filters</button></div>' +
     '</div>' +
     '<div class="dashboard-header" style="margin-top:0.2rem;">' +
@@ -1749,12 +1727,11 @@ function onProjectReportFilterChange() {
   projectReportFilter.designFrom = document.getElementById('pr-design-from').value;
   projectReportFilter.designTo = document.getElementById('pr-design-to').value;
   projectReportFilter.statuses = Array.prototype.filter.call(document.querySelectorAll('.pr-status-cb'), function (cb) { return cb.checked; }).map(function (cb) { return cb.value; });
-  projectReportFilter.teams = Array.prototype.filter.call(document.querySelectorAll('.pr-team-cb'), function (cb) { return cb.checked; }).map(function (cb) { return cb.value; });
   var body = document.getElementById('reports-body');
   if (body) body.innerHTML = renderProjectListReport(_reportsProjectsCache);
 }
 function clearProjectReportFilters() {
-  projectReportFilter = { statuses: [], installFrom: '', installTo: '', designFrom: '', designTo: '', teams: [] };
+  projectReportFilter = { statuses: [], installFrom: '', installTo: '', designFrom: '', designTo: '' };
   var body = document.getElementById('reports-body');
   if (body) body.innerHTML = renderProjectListReport(_reportsProjectsCache);
 }
