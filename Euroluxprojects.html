@@ -154,6 +154,10 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
 .quotes-list tbody tr.snap-late { background: #fef2f2; }
 .quotes-list tbody tr.snap-cols th { background: #e9e9e5; color: #333; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; padding: 0.4rem 0.9rem; white-space: nowrap; }
 .rpt-late { color: #b91c1c; font-weight: 700; }
+.cell-input.need-reason { border-color: #f59e0b; background: #fffbeb; }
+textarea.cell-input { resize: vertical; line-height: 1.35; overflow: hidden; font-family: inherit; }
+.task-done-text { color: #777; text-decoration: line-through; }
+.rpt-wrap { white-space: pre-wrap; word-break: break-word; max-width: 260px; }
 .mode-toggle { display: inline-flex; border: 1px solid #1a1a1a; border-radius: 6px; overflow: hidden; }
 .mode-toggle button { background: #fff; border: none; padding: 0.36rem 0.8rem; font-size: 0.72rem; font-weight: 600; cursor: pointer; font-family: var(--font-sans); }
 .mode-toggle button.on { background: #1a1a1a; color: #fff; }
@@ -465,7 +469,9 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
         <div class="form-group"><label>Actual Delivery Date</label><input type="date" id="if-actual-delivery" /></div>
         <div class="form-group"><label>Delivery Completed</label><select id="if-delivery-completion"><option value="">&mdash;</option><option>Full</option><option>Partial</option></select></div>
         <div class="form-group full"><label>What Was Delivered</label><input type="text" id="if-delivered-details" placeholder="e.g. 8 of 12 panels" /></div>
-        <div class="form-group full"><label>Task</label><input type="text" id="if-task" placeholder="e.g. Confirm glass delivery slot" /></div>
+        <div class="form-group full"><label>Reason for Delay</label><input type="text" id="if-delay-reason" placeholder="Why is this item delayed?" /></div>
+        <div class="form-group full"><label>Task</label><textarea id="if-task" rows="2" placeholder="e.g. Confirm glass delivery slot"></textarea></div>
+        <div class="form-group"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:normal;"><input type="checkbox" id="if-task-done" style="width:auto;" /> Task completed</label></div>
         <div class="form-group"><label>Task Assigned To</label><input type="text" id="if-task-assignee" list="assignee-list" /></div>
         <div class="form-group"><label>Task Due Date</label><input type="date" id="if-task-due" /></div>
         <div class="form-group"><label>PO Reference</label><input type="text" id="if-po-ref" /></div>
@@ -550,6 +556,21 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
       <button class="btn btn-ghost btn-sm" onclick="closeListModal()">&#10005;</button>
     </div>
     <div class="modal-body" id="list-modal-body"></div>
+  </div>
+</div>
+
+<!-- DELAY REASON PROMPT -->
+<div class="modal-overlay" id="prompt-modal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header"><h3>Reason for Delay</h3></div>
+    <div class="modal-body">
+      <p id="prompt-msg" style="font-size:0.85rem;margin-bottom:10px;"></p>
+      <textarea id="prompt-input" rows="3" placeholder="e.g. Glass supplier lead time extended"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeDelayPrompt()">Skip for now</button>
+      <button class="btn btn-primary" onclick="saveDelayPrompt()">Save reason</button>
+    </div>
   </div>
 </div>
 
@@ -1278,7 +1299,8 @@ function renderProjectDetail(project, items) {
               '<div class="detail-item"><div class="k">Glazing Type</div><div class="v">' + (esc(i.glazing_type) || '&mdash;') + '</div></div>' +
               (i.delivery_completion ? '<div class="detail-item"><div class="k">Delivery Completed</div><div class="v">' + esc(i.delivery_completion) + '</div></div>' : '') +
               (i.delivered_details ? '<div class="detail-item"><div class="k">What Was Delivered</div><div class="v">' + esc(i.delivered_details) + '</div></div>' : '') +
-              (i.task_text ? '<div class="detail-item"><div class="k">Task</div><div class="v">' + esc(i.task_text) + '</div></div><div class="detail-item"><div class="k">Assigned To</div><div class="v">' + (esc(i.task_assignee) || '&mdash;') + '</div></div><div class="detail-item"><div class="k">Task Due</div><div class="v"' + (taskIsUrgent(i) ? ' style="color:#b91c1c;font-weight:700;"' : '') + '>' + fmtDate(i.task_due_date) + (taskIsUrgent(i) ? ' &#9888;' : '') + '</div></div>' : '') +
+              (i.delay_reason ? '<div class="detail-item"><div class="k">Reason for Delay</div><div class="v">' + esc(i.delay_reason) + '</div></div>' : '') +
+              (i.task_text ? '<div class="detail-item"><div class="k">Task' + (i.task_completed ? ' (completed)' : '') + '</div><div class="v' + (i.task_completed ? ' task-done-text' : '') + '" style="white-space:pre-wrap;">' + esc(i.task_text) + '</div></div><div class="detail-item"><div class="k">Assigned To</div><div class="v">' + (esc(i.task_assignee) || '&mdash;') + '</div></div><div class="detail-item"><div class="k">Task Due</div><div class="v"' + (taskIsUrgent(i) ? ' style="color:#b91c1c;font-weight:700;"' : '') + '>' + fmtDate(i.task_due_date) + (taskIsUrgent(i) ? ' &#9888;' : '') + '</div></div>' : '') +
               (i.sorex_required ? '<div class="detail-item"><div class="k">SOREX Required</div><div class="v">' + esc(i.sorex_required) + '</div></div>' : '') +
               (i.winhaus_lock_position ? '<div class="detail-item"><div class="k">WINHAUS Lock Position</div><div class="v">' + esc(i.winhaus_lock_position) + '</div></div>' : '') +
             '</div>' +
@@ -1332,7 +1354,7 @@ function exportItemsCSV() {
   downloadCSV('items-' + (window.currentProjectData ? (window.currentProjectData.ref || window.currentProjectData.site_name) : 'project') + '.csv', currentProjectItems.map(function (i) {
     var cat = cache.categories.filter(function (c) { return c.id === i.category_id; })[0];
     var sup = cache.suppliers.filter(function (s) { return s.id === i.supplier_id; })[0];
-    return { Description: i.description, Category: cat ? cat.name : '', Supplier: sup ? sup.name : '', Qty: i.qty, UOM: i.uom, UnitCost: i.unit_cost, TotalCost: i.total_cost, PurchaseDate: i.purchase_date, LeadTimeDays: i.lead_time_days, RequiredDelivery: i.required_delivery, ActualDelivery: i.actual_delivery, PORef: i.po_ref, ApprovedGlass: i.approved_glass, GlazingType: i.glazing_type, SorexRequired: i.sorex_required, WinhausLockPosition: i.winhaus_lock_position, DeliveryCompleted: i.delivery_completion, WhatWasDelivered: i.delivered_details, Task: i.task_text, TaskAssignedTo: i.task_assignee, TaskDue: i.task_due_date, Status: i.item_status };
+    return { Description: i.description, Category: cat ? cat.name : '', Supplier: sup ? sup.name : '', Qty: i.qty, UOM: i.uom, UnitCost: i.unit_cost, TotalCost: i.total_cost, PurchaseDate: i.purchase_date, LeadTimeDays: i.lead_time_days, RequiredDelivery: i.required_delivery, ActualDelivery: i.actual_delivery, PORef: i.po_ref, ApprovedGlass: i.approved_glass, GlazingType: i.glazing_type, SorexRequired: i.sorex_required, WinhausLockPosition: i.winhaus_lock_position, DeliveryCompleted: i.delivery_completion, WhatWasDelivered: i.delivered_details, Task: i.task_text, TaskAssignedTo: i.task_assignee, TaskDue: i.task_due_date, TaskCompleted: i.task_completed ? 'Yes' : 'No', ReasonForDelay: i.delay_reason, Status: i.item_status };
   }));
 }
 
@@ -1502,6 +1524,8 @@ function openItemForm(item, mode) {
   document.getElementById('if-delivery-completion').value = isEdit ? (item.delivery_completion || '') : '';
   document.getElementById('if-delivered-details').value = isEdit ? (item.delivered_details || '') : '';
   document.getElementById('if-task').value = isEdit ? (item.task_text || '') : '';
+  document.getElementById('if-delay-reason').value = isEdit ? (item.delay_reason || '') : '';
+  document.getElementById('if-task-done').checked = isEdit ? !!item.task_completed : false;
   document.getElementById('if-task-assignee').value = isEdit ? (item.task_assignee || '') : '';
   document.getElementById('if-task-due').value = isEdit ? (item.task_due_date || '') : '';
   fillAssigneeList();
@@ -1529,7 +1553,7 @@ function onItemCategoryChange() {
   }
 }
 function setItemFormReadOnly(readOnly) {
-  ['if-desc', 'if-category', 'if-supplier', 'if-qty', 'if-uom', 'if-unit-cost', 'if-status', 'if-purchase-date', 'if-lead-time', 'if-required-delivery', 'if-actual-delivery', 'if-po-ref', 'if-glass', 'if-glazing', 'if-sorex', 'if-winhaus', 'if-delivery-completion', 'if-delivered-details', 'if-task', 'if-task-assignee', 'if-task-due'].forEach(function (id) {
+  ['if-desc', 'if-category', 'if-supplier', 'if-qty', 'if-uom', 'if-unit-cost', 'if-status', 'if-purchase-date', 'if-lead-time', 'if-required-delivery', 'if-actual-delivery', 'if-po-ref', 'if-glass', 'if-glazing', 'if-sorex', 'if-winhaus', 'if-delivery-completion', 'if-delivered-details', 'if-task', 'if-task-assignee', 'if-task-due', 'if-delay-reason', 'if-task-done'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.disabled = readOnly;
   });
@@ -1571,6 +1595,9 @@ function saveItem() {
     delivery_completion: document.getElementById('if-delivery-completion').value || null,
     delivered_details: document.getElementById('if-delivered-details').value.trim() || null,
     task_text: document.getElementById('if-task').value.trim() || null,
+    delay_reason: document.getElementById('if-delay-reason').value.trim() || null,
+    task_completed: document.getElementById('if-task-done').checked,
+    task_completed_date: document.getElementById('if-task-done').checked ? todayISO() : null,
     task_assignee: document.getElementById('if-task-assignee').value.trim() || null,
     task_due_date: document.getElementById('if-task-due').value || null,
     sorex_required: needsSorexWinhaus ? (document.getElementById('if-sorex').value || null) : null,
@@ -1607,18 +1634,47 @@ function deleteItemConfirm(id, desc) {
 // ============================================
 var TASK_ALERT_DAYS = 10; // tasks due within this many days (or overdue) show in red
 var snapFilter = { search: '', state: '', showCompleted: false, mode: 'edit', attention: false };
-var SNAP_COLS = ['', '', 'Product', 'Delivery Date', 'Status', 'Task', 'Assigned To', 'Task Due'];
+var SNAP_COLS = ['', '', 'Product', 'Delivery Date', 'Status', 'Reason for Delay', 'Task', 'Done', 'Assigned To', 'Task Due'];
 function taskIsUrgent(item) {
-  if (!item || !item.task_due_date) return false;
+  if (!item || !item.task_due_date || item.task_completed) return false;
   if (!item.task_text && !item.task_assignee) return false;
   return daysBetween(todayISO(), item.task_due_date) <= TASK_ALERT_DAYS;
+}
+function installDateFor(item) {
+  var arr = window._snapProjects || window._allProjectsCache || [];
+  for (var k = 0; k < arr.length; k++) { if (arr[k].id === item.project_id) return arr[k].install_date || null; }
+  return null;
 }
 function deliveryState(item) {
   if (item.item_status === 'Delivered' || item.item_status === 'Installed') return 'Delivered';
   if (item.actual_delivery && item.delivery_completion !== 'Partial') return 'Delivered';
   if (item.item_status === 'Delayed / At Risk') return 'Delayed';
   if (item.required_delivery && item.required_delivery < todayISO()) return 'Delayed';
+  var inst = installDateFor(item);
+  if (inst && item.required_delivery && item.required_delivery > inst) return 'Delayed';
   return 'On Target';
+}
+function needsDelayReason(item) { return deliveryState(item) === 'Delayed' && !(item.delay_reason && String(item.delay_reason).trim()); }
+function autosizeTa(el) { if (el && el.scrollHeight > 0) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }
+function autosizeAllTa() { Array.prototype.forEach.call(document.querySelectorAll('textarea.snap-ta'), autosizeTa); }
+// ---- "Reason for Delay" prompt ----
+var _promptItemId = null;
+function promptDelayReason(item) {
+  _promptItemId = item.id;
+  document.getElementById('prompt-msg').textContent = '\u201C' + (item.description || 'This item') + '\u201D is now behind the install date. Please enter the reason for the delay.';
+  document.getElementById('prompt-input').value = item.delay_reason || '';
+  document.getElementById('prompt-modal').classList.add('open');
+  setTimeout(function () { var el = document.getElementById('prompt-input'); if (el.focus) el.focus(); }, 30);
+}
+function closeDelayPrompt() { document.getElementById('prompt-modal').classList.remove('open'); _promptItemId = null; }
+function saveDelayPrompt() {
+  var id = _promptItemId, v = document.getElementById('prompt-input').value.trim();
+  if (!v) { toast('Please enter a reason, or press Skip', 'error'); return; }
+  closeDelayPrompt();
+  saveItemFields(id, { delay_reason: v }, function () {
+    var el = document.getElementById('sx-' + id); if (el) { el.value = v; autosizeTa(el); }
+    snapRefreshRow(id);
+  });
 }
 function fillAssigneeList() {
   var names = {};
@@ -1639,12 +1695,15 @@ function showSnapshot() {
 function snapItemRowHtml(i) {
   var st = deliveryState(i), urgent = taskIsUrgent(i);
   var stOpts = ['On Target', 'Delayed', 'Delivered'].map(function (o) { return '<option' + (o === st ? ' selected' : '') + '>' + o + '</option>'; }).join('');
+  var rows = function (txt, per) { return Math.max(2, Math.ceil(String(txt || '').length / per)); };
   return '<tr id="sr-' + i.id + '" class="' + (urgent ? 'snap-late' : '') + '">' +
     '<td></td><td></td>' +
     '<td>' + esc(i.description) + '</td>' +
     '<td><input type="date" class="cell-input" data-id="' + i.id + '" data-f="required_delivery" value="' + esc(i.required_delivery || '') + '" onchange="snapItemEdit(this)" /></td>' +
     '<td><select class="cell-input" id="ss-' + i.id + '" data-id="' + i.id + '" onchange="snapStateEdit(this)">' + stOpts + '</select></td>' +
-    '<td><input type="text" class="cell-input" style="min-width:170px;" data-id="' + i.id + '" data-f="task_text" value="' + esc(i.task_text || '') + '" placeholder="Create task" onchange="snapItemEdit(this)" /></td>' +
+    '<td><textarea class="cell-input snap-ta' + (needsDelayReason(i) ? ' need-reason' : '') + '" id="sx-' + i.id + '" rows="' + rows(i.delay_reason, 22) + '" style="min-width:150px;" data-id="' + i.id + '" data-f="delay_reason" placeholder="' + (st === 'Delayed' ? 'Enter reason for delay' : '') + '" oninput="autosizeTa(this)" onchange="snapItemEdit(this)">' + esc(i.delay_reason || '') + '</textarea></td>' +
+    '<td><textarea class="cell-input snap-ta" id="st-' + i.id + '" rows="' + rows(i.task_text, 26) + '" style="min-width:210px;" data-id="' + i.id + '" data-f="task_text" placeholder="Create task" oninput="autosizeTa(this)" onchange="snapItemEdit(this)">' + esc(i.task_text || '') + '</textarea></td>' +
+    '<td style="text-align:center;"><input type="checkbox" id="sk-' + i.id + '" data-id="' + i.id + '" title="Mark task completed" style="width:auto;" ' + (i.task_completed ? 'checked' : '') + ' onchange="snapTaskDone(this)" /></td>' +
     '<td><input type="text" class="cell-input" data-id="' + i.id + '" data-f="task_assignee" list="snap-assignee-list" value="' + esc(i.task_assignee || '') + '" placeholder="Assign to" onchange="snapItemEdit(this)" /></td>' +
     '<td><input type="date" class="cell-input' + (urgent ? ' due-red' : '') + '" id="sd-' + i.id + '" data-id="' + i.id + '" data-f="task_due_date" value="' + esc(i.task_due_date || '') + '" onchange="snapItemEdit(this)" /></td>' +
     '</tr>';
@@ -1655,7 +1714,9 @@ function snapItemReportRowHtml(i) {
     '<td>' + esc(i.description) + '</td>' +
     '<td>' + fmtDate(i.required_delivery) + '</td>' +
     '<td>' + statusBadge(st) + '</td>' +
-    '<td>' + (esc(i.task_text) || '&mdash;') + '</td>' +
+    '<td class="rpt-wrap">' + (esc(i.delay_reason) || (st === 'Delayed' ? '<span class="rpt-late">Reason needed</span>' : '&mdash;')) + '</td>' +
+    '<td class="rpt-wrap' + (i.task_completed ? ' task-done-text' : '') + '">' + (esc(i.task_text) || '&mdash;') + '</td>' +
+    '<td style="text-align:center;">' + (i.task_text ? (i.task_completed ? '&#10003;' : '&mdash;') : '') + '</td>' +
     '<td>' + (esc(i.task_assignee) || '&mdash;') + '</td>' +
     '<td' + (urgent ? ' class="rpt-late"' : '') + '>' + fmtDate(i.task_due_date) + (urgent ? ' &#9888;' : '') + '</td></tr>';
 }
@@ -1689,31 +1750,32 @@ function exportSnapshotPDF() {
   if (!blocks.length) { toast('Nothing to export', 'error'); return; }
   var pdfReady = typeof window.jspdf !== 'undefined' && typeof window.jspdf.jsPDF === 'function';
   var autoTableReady = pdfReady && typeof (new window.jspdf.jsPDF()).autoTable === 'function';
-  if (!pdfReady || !autoTableReady) { toast('PDF export library failed to load — check your connection and try again', 'error'); return; }
+  if (!pdfReady || !autoTableReady) { toast('PDF export library failed to load \u2014 check your connection and try again', 'error'); return; }
   try {
     var doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
     doc.setFontSize(14); doc.text('Eurolux Snapshot Report' + (snapFilter.attention ? ' - Tasks Needing Attention' : ''), 28, 30);
-    doc.setFontSize(8.5); doc.text('Generated ' + fmtDatePlain(todayISO()) + '  ·  ' + blocks.length + ' project(s)  ·  tasks due within ' + TASK_ALERT_DAYS + ' days or overdue are shown in red', 28, 44);
+    doc.setFontSize(8.5); doc.text('Generated ' + fmtDatePlain(todayISO()) + '  \u00b7  ' + blocks.length + ' project(s)  \u00b7  open tasks due within ' + TASK_ALERT_DAYS + ' days or overdue are shown in red', 28, 44);
     var y = 58;
     blocks.forEach(function (b) {
       var p = b.project;
       var body = b.items.length ? b.items.map(function (i) {
-        return [i.description || '', fmtDatePlain(i.required_delivery), deliveryState(i), i.task_text || '', i.task_assignee || '', fmtDatePlain(i.task_due_date), taskIsUrgent(i)];
-      }) : [['No products yet', '', '', '', '', '', false]];
+        var st = deliveryState(i);
+        return [i.description || '', fmtDatePlain(i.required_delivery), st, i.delay_reason || (st === 'Delayed' ? 'Reason needed' : ''), (i.task_text || '') + (i.task_completed ? '  [completed]' : ''), i.task_assignee || '', fmtDatePlain(i.task_due_date), taskIsUrgent(i)];
+      }) : [['No products yet', '', '', '', '', '', '', false]];
       doc.autoTable({
         startY: y,
-        head: [[{ content: p.site_name + (p.ref ? '  (' + p.ref + ')' : '') + '    Install date: ' + (fmtDatePlain(p.install_date) || '-') + '    Risk: ' + (p.delay_risk_status || '-'), colSpan: 6, styles: { fillColor: [26, 26, 26], textColor: 255, fontSize: 8.5 } }],
-               ['Product', 'Delivery Date', 'Status', 'Task', 'Assigned To', 'Task Due']],
-        body: body.map(function (r) { return r.slice(0, 6); }),
+        head: [[{ content: p.site_name + (p.ref ? '  (' + p.ref + ')' : '') + '    Install date: ' + (fmtDatePlain(p.install_date) || '-') + '    Risk: ' + (p.delay_risk_status || '-'), colSpan: 7, styles: { fillColor: [26, 26, 26], textColor: 255, fontSize: 8.5 } }],
+               ['Product', 'Delivery Date', 'Status', 'Reason for Delay', 'Task', 'Assigned To', 'Task Due']],
+        body: body.map(function (r) { return r.slice(0, 7); }),
         styles: { fontSize: 7.5, cellPadding: 3.5, overflow: 'linebreak' },
         headStyles: { fillColor: [233, 233, 229], textColor: 40 },
-        columnStyles: { 0: { cellWidth: 200 }, 1: { cellWidth: 70 }, 2: { cellWidth: 60 }, 3: { cellWidth: 200 }, 4: { cellWidth: 90 }, 5: { cellWidth: 70 } },
+        columnStyles: { 0: { cellWidth: 120 }, 1: { cellWidth: 60 }, 2: { cellWidth: 52 }, 3: { cellWidth: 140 }, 4: { cellWidth: 210 }, 5: { cellWidth: 70 }, 6: { cellWidth: 60 } },
         margin: { left: 28, right: 28 },
         didParseCell: function (data) {
           if (data.section === 'head' && data.row.index === 0) return;
-          if (data.section === 'body' && body[data.row.index] && body[data.row.index][6]) {
+          if (data.section === 'body' && body[data.row.index] && body[data.row.index][7]) {
             data.cell.styles.fillColor = [254, 226, 226];
-            if (data.column.index === 5) { data.cell.styles.textColor = [185, 28, 28]; data.cell.styles.fontStyle = 'bold'; }
+            if (data.column.index === 6) { data.cell.styles.textColor = [185, 28, 28]; data.cell.styles.fontStyle = 'bold'; }
           }
         }
       });
@@ -1733,9 +1795,9 @@ function renderSnapshot() {
       '<td colspan="2"><span class="link-btn" style="font-weight:700;" onclick="showProjectDetail(\'' + p.id + '\')">' + esc(p.site_name) + '</span>' + (p.ref ? '<div class="muted" style="font-size:0.7rem;">' + esc(p.ref) + '</div>' : '') + '</td>' +
       '<td class="muted" style="font-size:0.72rem;">Install date</td>' +
       '<td>' + (report ? '<strong>' + fmtDate(p.install_date) + '</strong>' : '<input type="date" class="cell-input" data-pid="' + p.id + '" value="' + esc(p.install_date || '') + '" onchange="snapProjectInstallEdit(this)" />') + '</td>' +
-      '<td colspan="4">' + statusBadge(p.delay_risk_status) + ' <span class="muted" style="font-size:0.72rem;margin-left:6px;">' + its.length + ' product(s)</span></td></tr>';
+      '<td colspan="6">' + statusBadge(p.delay_risk_status) + ' <span class="muted" style="font-size:0.72rem;margin-left:6px;">' + its.length + ' product(s)</span></td></tr>';
     body += snapColsRowHtml();
-    if (!its.length) body += '<tr><td></td><td></td><td colspan="6" class="muted">No products yet</td></tr>';
+    if (!its.length) body += '<tr><td></td><td></td><td colspan="8" class="muted">No products yet</td></tr>';
     body += its.map(report ? snapItemReportRowHtml : snapItemRowHtml).join('');
   });
   var table = body ? '<table class="quotes-list static"><tbody>' + body + '</tbody></table>'
@@ -1757,6 +1819,7 @@ function renderSnapshot() {
     '<div class="quotes-list-wrap">' + table + '</div>'
   );
   fillAssigneeList();
+  autosizeAllTa();
 }
 function onSnapFilterChange(keepFocus) {
   snapFilter.search = document.getElementById('sn-search').value;
@@ -1771,14 +1834,36 @@ function snapRefreshRow(id) {
   if (tr) tr.className = urgent ? 'snap-late' : '';
   var d = document.getElementById('sd-' + id);
   if (d) d.className = 'cell-input' + (urgent ? ' due-red' : '');
+  var st = deliveryState(it);
   var ss = document.getElementById('ss-' + id);
-  if (ss) ss.value = deliveryState(it);
+  if (ss) ss.value = st;
+  var sx = document.getElementById('sx-' + id);
+  if (sx) { sx.classList.toggle('need-reason', needsDelayReason(it)); sx.placeholder = st === 'Delayed' ? 'Enter reason for delay' : ''; }
+  var sk = document.getElementById('sk-' + id);
+  if (sk) sk.checked = !!it.task_completed;
+  var stx = document.getElementById('st-' + id);
+  if (stx) stx.classList.toggle('task-done-text', !!it.task_completed);
   fillAssigneeList();
 }
 function snapItemEdit(el) {
   var id = el.getAttribute('data-id'), f = el.getAttribute('data-f');
+  var it = findCachedItem(id); if (!it) return;
   var fields = {}; fields[f] = el.value.trim() === '' ? null : el.value.trim();
-  saveItemFields(id, fields, function () { snapRefreshRow(id); });
+  var becameDelayed = false;
+  if (f === 'required_delivery') {
+    var inst = installDateFor(it), nd = fields[f], prev = it.required_delivery;
+    var delivered = it.item_status === 'Delivered' || it.item_status === 'Installed';
+    if (nd && inst && nd > inst && !delivered) {
+      if (it.item_status !== 'Delayed / At Risk') fields.item_status = 'Delayed / At Risk';
+      becameDelayed = true;
+    } else if (nd && inst && nd <= inst && prev && prev > inst && it.item_status === 'Delayed / At Risk') {
+      fields.item_status = 'Ordered';
+    }
+  }
+  saveItemFields(id, fields, function () {
+    snapRefreshRow(id);
+    if (becameDelayed && !(it.delay_reason && String(it.delay_reason).trim())) promptDelayReason(it);
+  });
 }
 function snapStateEdit(el) {
   var id = el.getAttribute('data-id');
@@ -1794,6 +1879,14 @@ function snapStateEdit(el) {
     if (['Delayed / At Risk', 'Delivered', 'Installed'].indexOf(it.item_status) !== -1) fields.item_status = 'Ordered';
     if (it.actual_delivery && it.delivery_completion !== 'Partial') fields.actual_delivery = null;
   }
+  saveItemFields(id, fields, function () {
+    snapRefreshRow(id);
+    if (el.value === 'Delayed' && !(it.delay_reason && String(it.delay_reason).trim())) promptDelayReason(it);
+  });
+}
+function snapTaskDone(el) {
+  var id = el.getAttribute('data-id');
+  var fields = { task_completed: !!el.checked, task_completed_date: el.checked ? todayISO() : null };
   saveItemFields(id, fields, function () { snapRefreshRow(id); });
 }
 function snapProjectInstallEdit(el) {
@@ -1802,13 +1895,14 @@ function snapProjectInstallEdit(el) {
   updateProjectRow(pid, { install_date: val }).then(function () {
     (window._snapProjects || []).forEach(function (p) { if (p.id === pid) p.install_date = val; });
     toast('Install date saved', 'success');
+    renderSnapshot(); // statuses are re-evaluated against the new install date
   }).catch(function (e) { toast('Save failed: ' + e.message, 'error'); });
 }
 function exportSnapshotCSV() {
   var rows = [];
   (window._snapProjects || []).forEach(function (p) {
     (window._snapItems || []).filter(function (i) { return i.project_id === p.id; }).forEach(function (i) {
-      rows.push({ Project: p.site_name, InstallDate: p.install_date, Product: i.description, DeliveryDate: i.required_delivery, Status: deliveryState(i), Task: i.task_text, AssignedTo: i.task_assignee, TaskDue: i.task_due_date });
+      rows.push({ Project: p.site_name, InstallDate: p.install_date, Product: i.description, DeliveryDate: i.required_delivery, Status: deliveryState(i), ReasonForDelay: i.delay_reason, Task: i.task_text, TaskCompleted: i.task_completed ? 'Yes' : 'No', AssignedTo: i.task_assignee, TaskDue: i.task_due_date });
     });
   });
   downloadCSV('eurolux-snapshot.csv', rows);
