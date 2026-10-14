@@ -154,6 +154,8 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
 .quotes-list tbody tr.snap-late { background: #fef2f2; }
 .quotes-list tbody tr.snap-cols th { background: #e9e9e5; color: #333; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; padding: 0.4rem 0.9rem; white-space: nowrap; }
 .rpt-late { color: #b91c1c; font-weight: 700; }
+.cell-input.snap-ta { resize: vertical; overflow: hidden; line-height: 1.35; font-family: inherit; white-space: pre-wrap; }
+.rpt-task { white-space: pre-wrap; word-break: break-word; }
 .task-done-text { color: #777; text-decoration: line-through; }
 .task-hidden { color: #999; font-size: 0.72rem; font-style: italic; }
 .mode-toggle { display: inline-flex; border: 1px solid #1a1a1a; border-radius: 6px; overflow: hidden; }
@@ -467,7 +469,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
         <div class="form-group"><label>Actual Delivery Date</label><input type="date" id="if-actual-delivery" /></div>
         <div class="form-group"><label>Delivery Completed</label><select id="if-delivery-completion"><option value="">&mdash;</option><option>Full</option><option>Partial</option></select></div>
         <div class="form-group full"><label>What Was Delivered</label><input type="text" id="if-delivered-details" placeholder="e.g. 8 of 12 panels" /></div>
-        <div class="form-group full"><label>Task</label><input type="text" id="if-task" placeholder="e.g. Confirm glass delivery slot" /></div>
+        <div class="form-group full"><label>Task</label><textarea id="if-task" rows="3" placeholder="e.g. Confirm glass delivery slot"></textarea></div>
         <div class="form-group"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:normal;"><input type="checkbox" id="if-task-done" style="width:auto;" onchange="onItemTaskDoneChange()" /> Task completed</label></div>
         <div class="form-group"><label>Date Completed</label><input type="date" id="if-task-done-date" /></div>
         <div class="form-group"><label>Task Assigned To</label><input type="text" id="if-task-assignee" list="assignee-list" /></div>
@@ -1282,7 +1284,7 @@ function renderProjectDetail(project, items) {
               '<div class="detail-item"><div class="k">Glazing Type</div><div class="v">' + (esc(i.glazing_type) || '&mdash;') + '</div></div>' +
               (i.delivery_completion ? '<div class="detail-item"><div class="k">Delivery Completed</div><div class="v">' + esc(i.delivery_completion) + '</div></div>' : '') +
               (i.delivered_details ? '<div class="detail-item"><div class="k">What Was Delivered</div><div class="v">' + esc(i.delivered_details) + '</div></div>' : '') +
-              (i.task_text ? '<div class="detail-item"><div class="k">Task' + (i.task_completed ? ' (completed ' + fmtDatePlain(i.task_completed_date) + ')' : '') + '</div><div class="v' + (i.task_completed ? ' task-done-text' : '') + '">' + esc(i.task_text) + '</div></div><div class="detail-item"><div class="k">Assigned To</div><div class="v">' + (esc(i.task_assignee) || '&mdash;') + '</div></div><div class="detail-item"><div class="k">Task Due</div><div class="v"' + (taskIsUrgent(i) ? ' style="color:#b91c1c;font-weight:700;"' : '') + '>' + fmtDate(i.task_due_date) + (taskIsUrgent(i) ? ' &#9888;' : '') + '</div></div>' : '') +
+              (i.task_text ? '<div class="detail-item"><div class="k">Task' + (i.task_completed ? ' (completed ' + fmtDatePlain(i.task_completed_date) + ')' : '') + '</div><div class="v' + (i.task_completed ? ' task-done-text' : '') + '" style="white-space:pre-wrap;">' + esc(i.task_text) + '</div></div><div class="detail-item"><div class="k">Assigned To</div><div class="v">' + (esc(i.task_assignee) || '&mdash;') + '</div></div><div class="detail-item"><div class="k">Task Due</div><div class="v"' + (taskIsUrgent(i) ? ' style="color:#b91c1c;font-weight:700;"' : '') + '>' + fmtDate(i.task_due_date) + (taskIsUrgent(i) ? ' &#9888;' : '') + '</div></div>' : '') +
               (i.sorex_required ? '<div class="detail-item"><div class="k">SOREX Required</div><div class="v">' + esc(i.sorex_required) + '</div></div>' : '') +
               (i.winhaus_lock_position ? '<div class="detail-item"><div class="k">WINHAUS Lock Position</div><div class="v">' + esc(i.winhaus_lock_position) + '</div></div>' : '') +
             '</div>' +
@@ -1650,6 +1652,8 @@ function taskIsUrgent(item) {
   if (!item.task_text && !item.task_assignee) return false;
   return daysBetween(todayISO(), item.task_due_date) <= TASK_ALERT_DAYS;
 }
+function autosizeTa(el) { if (el && el.scrollHeight > 0) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }
+function autosizeAllTa() { Array.prototype.forEach.call(document.querySelectorAll('textarea.snap-ta'), autosizeTa); }
 function snapTaskHidden(i) { return !!(snapFilter.hideDone && i.task_completed); }
 function deliveryState(item) {
   if (item.item_status === 'Delivered' || item.item_status === 'Installed') return 'Delivered';
@@ -1686,7 +1690,7 @@ function snapItemRowHtml(i) {
     return head + '<td colspan="4"><span class="task-hidden">Completed task hidden</span></td></tr>';
   }
   return head +
-    '<td><input type="text" class="cell-input' + (i.task_completed ? ' task-done-text' : '') + '" id="st-' + i.id + '" style="min-width:170px;" data-id="' + i.id + '" data-f="task_text" value="' + esc(i.task_text || '') + '" placeholder="Create task" onchange="snapItemEdit(this)" /></td>' +
+    '<td><textarea class="cell-input snap-ta' + (i.task_completed ? ' task-done-text' : '') + '" id="st-' + i.id + '" rows="' + Math.max(2, Math.ceil(String(i.task_text || '').length / 38)) + '" style="min-width:260px;" data-id="' + i.id + '" data-f="task_text" placeholder="Create task" oninput="autosizeTa(this)" onchange="snapItemEdit(this)">' + esc(i.task_text || '') + '</textarea></td>' +
     '<td style="white-space:nowrap;"><label style="display:inline-flex;align-items:center;gap:5px;font-size:0.74rem;"><input type="checkbox" id="sk-' + i.id + '" data-id="' + i.id + '" style="width:auto;" ' + (i.task_completed ? 'checked' : '') + ' onchange="snapTaskDone(this)" /> Done</label> ' +
       '<input type="date" class="cell-input" id="sc-' + i.id + '" data-id="' + i.id + '" data-f="task_completed_date" title="Date completed" style="width:130px;min-width:0;' + (i.task_completed ? '' : 'display:none;') + '" value="' + esc(i.task_completed_date || '') + '" onchange="snapItemEdit(this)" /></td>' +
     '<td><input type="text" class="cell-input" data-id="' + i.id + '" data-f="task_assignee" list="snap-assignee-list" value="' + esc(i.task_assignee || '') + '" placeholder="Assign to" onchange="snapItemEdit(this)" /></td>' +
@@ -1701,7 +1705,7 @@ function snapItemReportRowHtml(i) {
     '<td>' + statusBadge(st) + '</td>';
   if (snapTaskHidden(i)) return head + '<td colspan="4"><span class="task-hidden">Completed task hidden</span></td></tr>';
   return head +
-    '<td' + (i.task_completed ? ' class="task-done-text"' : '') + '>' + (esc(i.task_text) || '&mdash;') + '</td>' +
+    '<td class="rpt-task' + (i.task_completed ? ' task-done-text' : '') + '">' + (esc(i.task_text) || '&mdash;') + '</td>' +
     '<td>' + (i.task_completed ? '&#10003; ' + fmtDate(i.task_completed_date) : (i.task_text ? '&mdash;' : '')) + '</td>' +
     '<td>' + (esc(i.task_assignee) || '&mdash;') + '</td>' +
     '<td' + (urgent ? ' class="rpt-late"' : '') + '>' + fmtDate(i.task_due_date) + (urgent ? ' &#9888;' : '') + '</td></tr>';
@@ -1806,6 +1810,7 @@ function renderSnapshot() {
     '<div class="quotes-list-wrap">' + table + '</div>'
   );
   fillAssigneeList();
+  autosizeAllTa();
 }
 function onSnapFilterChange(keepFocus) {
   snapFilter.search = document.getElementById('sn-search').value;
