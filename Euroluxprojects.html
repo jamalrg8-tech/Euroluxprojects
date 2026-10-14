@@ -1606,7 +1606,7 @@ function deleteItemConfirm(id, desc) {
 // SNAPSHOT (project / product delivery overview + tasks)
 // ============================================
 var TASK_ALERT_DAYS = 10; // tasks due within this many days (or overdue) show in red
-var snapFilter = { search: '', state: '', showCompleted: false, mode: 'edit' };
+var snapFilter = { search: '', state: '', showCompleted: false, mode: 'edit', attention: false };
 var SNAP_COLS = ['', '', 'Product', 'Delivery Date', 'Status', 'Task', 'Assigned To', 'Task Due'];
 function taskIsUrgent(item) {
   if (!item || !item.task_due_date) return false;
@@ -1662,6 +1662,7 @@ function snapItemReportRowHtml(i) {
 function snapColsRowHtml() {
   return '<tr class="snap-cols">' + SNAP_COLS.map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr>';
 }
+function setSnapAttention(on) { snapFilter.attention = !!on; renderSnapshot(); }
 function setSnapMode(m) { snapFilter.mode = m; renderSnapshot(); }
 function snapVisibleBlocks() {
   var projects = (window._snapProjects || []).slice();
@@ -1676,7 +1677,8 @@ function snapVisibleBlocks() {
   projects.forEach(function (p) {
     var its = items.filter(function (i) { return i.project_id === p.id; });
     if (snapFilter.state) its = its.filter(function (i) { return deliveryState(i) === snapFilter.state; });
-    if (snapFilter.state && !its.length) return;
+    if (snapFilter.attention) its = its.filter(taskIsUrgent);
+    if ((snapFilter.state || snapFilter.attention) && !its.length) return;
     its.sort(function (a, b) { return (a.required_delivery || '9999').localeCompare(b.required_delivery || '9999'); });
     blocks.push({ project: p, items: its });
   });
@@ -1690,7 +1692,7 @@ function exportSnapshotPDF() {
   if (!pdfReady || !autoTableReady) { toast('PDF export library failed to load — check your connection and try again', 'error'); return; }
   try {
     var doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-    doc.setFontSize(14); doc.text('Eurolux Snapshot Report', 28, 30);
+    doc.setFontSize(14); doc.text('Eurolux Snapshot Report' + (snapFilter.attention ? ' - Tasks Needing Attention' : ''), 28, 30);
     doc.setFontSize(8.5); doc.text('Generated ' + fmtDatePlain(todayISO()) + '  ·  ' + blocks.length + ' project(s)  ·  tasks due within ' + TASK_ALERT_DAYS + ' days or overdue are shown in red', 28, 44);
     var y = 58;
     blocks.forEach(function (b) {
@@ -1739,7 +1741,7 @@ function renderSnapshot() {
   var table = body ? '<table class="quotes-list static"><tbody>' + body + '</tbody></table>'
     : '<div class="empty-state"><div class="icon">&#128203;</div><h3>Nothing to show</h3></div>';
   render(
-    '<div class="dashboard-header"><div>' + backButtonHtml() + '<h1>Snapshot Report</h1><p>' + (report ? 'Read-only report view &mdash; print it or download it as a PDF. ' : 'Edit here and it saves to the main screens. ') + 'Tasks due within ' + TASK_ALERT_DAYS + ' days (or overdue) show in red.' + (urgentCount ? ' <strong class="snap-flag">' + urgentCount + ' task(s) need attention.</strong>' : '') + '</p></div>' +
+    '<div class="dashboard-header"><div>' + backButtonHtml() + '<h1>Snapshot Report</h1><p>' + (report ? 'Read-only report view &mdash; print it or download it as a PDF. ' : 'Edit here and it saves to the main screens. ') + 'Tasks due within ' + TASK_ALERT_DAYS + ' days (or overdue) show in red.' + (snapFilter.attention ? ' <strong class="snap-flag">Showing only the ' + urgentCount + ' task(s) needing attention.</strong> <button class="link-btn" onclick="setSnapAttention(false)">Show all</button>' : (urgentCount ? ' <button class="link-btn snap-flag" style="text-decoration:underline;" title="Click to list only these tasks" onclick="setSnapAttention(true)">' + urgentCount + ' task(s) need attention &mdash; click to view</button>' : '')) + '</p></div>' +
       '<div class="search-wrap">' +
         '<div class="mode-toggle"><button class="' + (report ? '' : 'on') + '" onclick="setSnapMode(\'edit\')">Edit view</button><button class="' + (report ? 'on' : '') + '" onclick="setSnapMode(\'report\')">Report view</button></div>' +
         '<button class="btn btn-primary btn-sm" onclick="exportSnapshotPDF()">Download PDF</button>' +
