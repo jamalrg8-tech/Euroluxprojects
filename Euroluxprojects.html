@@ -154,6 +154,14 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
 .quotes-list tbody tr.snap-late { background: #fef2f2; }
 .quotes-list tbody tr.snap-cols th { background: #e9e9e5; color: #333; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; padding: 0.4rem 0.9rem; white-space: nowrap; }
 .rpt-late { color: #b91c1c; font-weight: 700; }
+.quotes-list tbody tr.snap-addrow td { padding-top: 0.2rem; padding-bottom: 0.5rem; }
+.snap-del { border: none; background: none; color: #b91c1c; cursor: pointer; font-size: 0.85rem; padding: 0 4px; }
+.task-line input[type=text] { flex: 0 0 140px; }
+.task-line .tl-donelbl { display: flex; align-items: center; gap: 4px; font-size: 0.74rem; text-transform: none; letter-spacing: normal; white-space: nowrap; margin-top: 8px; }
+.task-line .tl-donelbl input { width: auto; }
+.snap-toggle { width: 26px; height: 26px; padding: 0; border: 1px solid #bbb; border-radius: 4px; background: #fff; font-size: 0.9rem; font-weight: 700; line-height: 1; cursor: pointer; }
+.snap-toggle:hover { background: #f0f0f0; }
+.quotes-list tbody tr.snap-collapsed td { padding-top: 0.45rem; padding-bottom: 0.45rem; color: #555; background: #fafafa; }
 .cell-input.need-reason { border-color: #f59e0b; background: #fffbeb; }
 textarea.cell-input { resize: vertical; line-height: 1.35; overflow: hidden; font-family: inherit; }
 .task-done-text { color: #777; text-decoration: line-through; }
@@ -163,7 +171,7 @@ textarea.cell-input { resize: vertical; line-height: 1.35; overflow: hidden; fon
 .mode-toggle button.on { background: #1a1a1a; color: #fff; }
 @media print {
   @page { size: A4 landscape; margin: 10mm; }
-  .app-nav, .app-footer, .search-wrap, .mode-toggle, .back-link, #toast, .toast { display: none !important; }
+  .snap-toggle, .app-nav, .app-footer, .search-wrap, .mode-toggle, .back-link, #toast, .toast { display: none !important; }
   .app-content { padding: 0 !important; max-width: none !important; }
   .quotes-list { box-shadow: none; }
   .quotes-list tbody tr { page-break-inside: avoid; }
@@ -470,10 +478,11 @@ textarea.cell-input { resize: vertical; line-height: 1.35; overflow: hidden; fon
         <div class="form-group"><label>Delivery Completed</label><select id="if-delivery-completion"><option value="">&mdash;</option><option>Full</option><option>Partial</option></select></div>
         <div class="form-group full"><label>What Was Delivered</label><input type="text" id="if-delivered-details" placeholder="e.g. 8 of 12 panels" /></div>
         <div class="form-group full"><label>Reason for Delay</label><input type="text" id="if-delay-reason" placeholder="Why is this item delayed?" /></div>
-        <div class="form-group full"><label>Task</label><textarea id="if-task" rows="2" placeholder="e.g. Confirm glass delivery slot"></textarea></div>
-        <div class="form-group"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:normal;"><input type="checkbox" id="if-task-done" style="width:auto;" /> Task completed</label></div>
-        <div class="form-group"><label>Task Assigned To</label><input type="text" id="if-task-assignee" list="assignee-list" /></div>
-        <div class="form-group"><label>Task Due Date</label><input type="date" id="if-task-due" /></div>
+        <div class="form-group full">
+          <label>Tasks</label>
+          <div id="if-tasks-lines"></div>
+          <button type="button" class="btn btn-secondary btn-sm" id="if-add-task-btn" onclick="addTaskLine()">+ Add task</button>
+        </div>
         <div class="form-group"><label>PO Reference</label><input type="text" id="if-po-ref" /></div>
         <div class="form-group"><label>Approved Glass</label><input type="text" id="if-glass" list="glass-list" placeholder="Pick or type a new one" /></div>
         <div class="form-group"><label>Glazing Type</label><input type="text" id="if-glazing" list="glazing-list" placeholder="Pick or type a new one" /></div>
@@ -1300,7 +1309,7 @@ function renderProjectDetail(project, items) {
               (i.delivery_completion ? '<div class="detail-item"><div class="k">Delivery Completed</div><div class="v">' + esc(i.delivery_completion) + '</div></div>' : '') +
               (i.delivered_details ? '<div class="detail-item"><div class="k">What Was Delivered</div><div class="v">' + esc(i.delivered_details) + '</div></div>' : '') +
               (i.delay_reason ? '<div class="detail-item"><div class="k">Reason for Delay</div><div class="v">' + esc(i.delay_reason) + '</div></div>' : '') +
-              (i.task_text ? '<div class="detail-item"><div class="k">Task' + (i.task_completed ? ' (completed)' : '') + '</div><div class="v' + (i.task_completed ? ' task-done-text' : '') + '" style="white-space:pre-wrap;">' + esc(i.task_text) + '</div></div><div class="detail-item"><div class="k">Assigned To</div><div class="v">' + (esc(i.task_assignee) || '&mdash;') + '</div></div><div class="detail-item"><div class="k">Task Due</div><div class="v"' + (taskIsUrgent(i) ? ' style="color:#b91c1c;font-weight:700;"' : '') + '>' + fmtDate(i.task_due_date) + (taskIsUrgent(i) ? ' &#9888;' : '') + '</div></div>' : '') +
+              itemTasksHtml(i) +
               (i.sorex_required ? '<div class="detail-item"><div class="k">SOREX Required</div><div class="v">' + esc(i.sorex_required) + '</div></div>' : '') +
               (i.winhaus_lock_position ? '<div class="detail-item"><div class="k">WINHAUS Lock Position</div><div class="v">' + esc(i.winhaus_lock_position) + '</div></div>' : '') +
             '</div>' +
@@ -1354,18 +1363,42 @@ function exportItemsCSV() {
   downloadCSV('items-' + (window.currentProjectData ? (window.currentProjectData.ref || window.currentProjectData.site_name) : 'project') + '.csv', currentProjectItems.map(function (i) {
     var cat = cache.categories.filter(function (c) { return c.id === i.category_id; })[0];
     var sup = cache.suppliers.filter(function (s) { return s.id === i.supplier_id; })[0];
-    return { Description: i.description, Category: cat ? cat.name : '', Supplier: sup ? sup.name : '', Qty: i.qty, UOM: i.uom, UnitCost: i.unit_cost, TotalCost: i.total_cost, PurchaseDate: i.purchase_date, LeadTimeDays: i.lead_time_days, RequiredDelivery: i.required_delivery, ActualDelivery: i.actual_delivery, PORef: i.po_ref, ApprovedGlass: i.approved_glass, GlazingType: i.glazing_type, SorexRequired: i.sorex_required, WinhausLockPosition: i.winhaus_lock_position, DeliveryCompleted: i.delivery_completion, WhatWasDelivered: i.delivered_details, Task: i.task_text, TaskAssignedTo: i.task_assignee, TaskDue: i.task_due_date, TaskCompleted: i.task_completed ? 'Yes' : 'No', ReasonForDelay: i.delay_reason, Status: i.item_status };
+    return { Description: i.description, Category: cat ? cat.name : '', Supplier: sup ? sup.name : '', Qty: i.qty, UOM: i.uom, UnitCost: i.unit_cost, TotalCost: i.total_cost, PurchaseDate: i.purchase_date, LeadTimeDays: i.lead_time_days, RequiredDelivery: i.required_delivery, ActualDelivery: i.actual_delivery, PORef: i.po_ref, ApprovedGlass: i.approved_glass, GlazingType: i.glazing_type, SorexRequired: i.sorex_required, WinhausLockPosition: i.winhaus_lock_position, DeliveryCompleted: i.delivery_completion, WhatWasDelivered: i.delivered_details, Tasks: itemTasks(i).map(function (t) { return t.text + ' [' + (t.assignee || '-') + ', due ' + (t.due || '-') + (t.done ? ', done' : '') + ']'; }).join(' | '), ReasonForDelay: i.delay_reason, Status: i.item_status };
   }));
 }
 
 // ============================================
 // PROJECT FORM (modal)
 // ============================================
+// Older notes were one block of text, often starting "2/7/26: ...". Pull a leading date (d/m/yy, d/m/yyyy, d-m-yy ...) into the date field.
+function parseLeadingDate(line) {
+  var m = /^\s*(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4}|\d{2})\s*(?:[:\-–—]\s*)?([\s\S]*)$/.exec(line);
+  if (!m) return null;
+  var dd = +m[1], mo = +m[2], y = +m[3];
+  if (y < 100) y += 2000;
+  if (mo < 1 || mo > 12 || dd < 1 || dd > 31) return null;
+  return { date: y + '-' + String(mo).padStart(2, '0') + '-' + String(dd).padStart(2, '0'), text: m[4].trim() };
+}
+function legacyNoteLines(text) {
+  var out = [];
+  String(text || '').split(/\r?\n/).forEach(function (raw) {
+    var l = raw.trim(); if (!l) return;
+    var p = parseLeadingDate(l);
+    if (p) { out.push({ date: p.date, text: p.text }); }
+    else if (out.length) { var last = out[out.length - 1]; last.text = last.text ? last.text + '\n' + l : l; } // wrapped line: belongs to the note above
+    else { out.push({ date: '', text: l }); }
+  });
+  return out;
+}
 function projectNoteEntries(project) {
-  if (project && Array.isArray(project.notes_log) && project.notes_log.length) return project.notes_log;
-  if (project && project.notes) {
-    return String(project.notes).split(/\r?\n/).filter(function (l) { return l.trim(); }).map(function (l) { return { date: '', text: l.trim() }; });
+  if (project && Array.isArray(project.notes_log) && project.notes_log.length) {
+    return project.notes_log.map(function (n) {
+      if (n.date) return n;
+      var p = parseLeadingDate(n.text || '');
+      return p && p.text ? { date: p.date, text: p.text } : n;
+    });
   }
+  if (project && project.notes) return legacyNoteLines(project.notes);
   return [];
 }
 var itemNoteEntries = projectNoteEntries; // items use the same shape: notes_log [{date,text}] + legacy notes text
@@ -1523,11 +1556,8 @@ function openItemForm(item, mode) {
   document.getElementById('if-po-ref').value = isEdit ? (item.po_ref || '') : '';
   document.getElementById('if-delivery-completion').value = isEdit ? (item.delivery_completion || '') : '';
   document.getElementById('if-delivered-details').value = isEdit ? (item.delivered_details || '') : '';
-  document.getElementById('if-task').value = isEdit ? (item.task_text || '') : '';
+  renderTaskLines(isEdit ? itemTasks(item) : []);
   document.getElementById('if-delay-reason').value = isEdit ? (item.delay_reason || '') : '';
-  document.getElementById('if-task-done').checked = isEdit ? !!item.task_completed : false;
-  document.getElementById('if-task-assignee').value = isEdit ? (item.task_assignee || '') : '';
-  document.getElementById('if-task-due').value = isEdit ? (item.task_due_date || '') : '';
   fillAssigneeList();
   document.getElementById('if-glass').value = isEdit ? (item.approved_glass || '') : '';
   document.getElementById('glass-list').innerHTML = cache.glassTypes.map(function (g) { return '<option value="' + esc(g.name) + '">'; }).join('');
@@ -1553,12 +1583,13 @@ function onItemCategoryChange() {
   }
 }
 function setItemFormReadOnly(readOnly) {
-  ['if-desc', 'if-category', 'if-supplier', 'if-qty', 'if-uom', 'if-unit-cost', 'if-status', 'if-purchase-date', 'if-lead-time', 'if-required-delivery', 'if-actual-delivery', 'if-po-ref', 'if-glass', 'if-glazing', 'if-sorex', 'if-winhaus', 'if-delivery-completion', 'if-delivered-details', 'if-task', 'if-task-assignee', 'if-task-due', 'if-delay-reason', 'if-task-done'].forEach(function (id) {
+  ['if-desc', 'if-category', 'if-supplier', 'if-qty', 'if-uom', 'if-unit-cost', 'if-status', 'if-purchase-date', 'if-lead-time', 'if-required-delivery', 'if-actual-delivery', 'if-po-ref', 'if-glass', 'if-glazing', 'if-sorex', 'if-winhaus', 'if-delivery-completion', 'if-delivered-details', 'if-delay-reason'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.disabled = readOnly;
   });
-  Array.prototype.forEach.call(document.querySelectorAll('#if-notes-lines input, #if-notes-lines textarea, #if-notes-lines button'), function (el) { el.disabled = readOnly; });
+  Array.prototype.forEach.call(document.querySelectorAll('#if-notes-lines input, #if-notes-lines textarea, #if-notes-lines button, #if-tasks-lines input, #if-tasks-lines textarea, #if-tasks-lines button'), function (el) { el.disabled = readOnly; });
   document.getElementById('if-add-note-btn').style.display = readOnly ? 'none' : '';
+  document.getElementById('if-add-task-btn').style.display = readOnly ? 'none' : '';
   document.getElementById('if-close-btn').style.display = readOnly ? 'inline-flex' : 'none';
   document.getElementById('if-cancel-btn').style.display = readOnly ? 'none' : 'inline-flex';
   document.getElementById('if-edit-btn').style.display = readOnly ? 'inline-flex' : 'none';
@@ -1594,12 +1625,13 @@ function saveItem() {
     notes_log: collectNoteLines('if-notes-lines'),
     delivery_completion: document.getElementById('if-delivery-completion').value || null,
     delivered_details: document.getElementById('if-delivered-details').value.trim() || null,
-    task_text: document.getElementById('if-task').value.trim() || null,
+    tasks: collectTaskLines(),
+    task_text: null,
+    task_assignee: null,
+    task_due_date: null,
     delay_reason: document.getElementById('if-delay-reason').value.trim() || null,
-    task_completed: document.getElementById('if-task-done').checked,
-    task_completed_date: document.getElementById('if-task-done').checked ? todayISO() : null,
-    task_assignee: document.getElementById('if-task-assignee').value.trim() || null,
-    task_due_date: document.getElementById('if-task-due').value || null,
+    task_completed: false,
+    task_completed_date: null,
     sorex_required: needsSorexWinhaus ? (document.getElementById('if-sorex').value || null) : null,
     winhaus_lock_position: needsSorexWinhaus ? (document.getElementById('if-winhaus').value || null) : null
   };
@@ -1633,12 +1665,76 @@ function deleteItemConfirm(id, desc) {
 // SNAPSHOT (project / product delivery overview + tasks)
 // ============================================
 var TASK_ALERT_DAYS = 10; // tasks due within this many days (or overdue) show in red
-var snapFilter = { search: '', state: '', showCompleted: false, mode: 'edit', attention: false };
+var snapFilter = { search: '', state: '', showCompleted: false, mode: 'edit', attention: false, expandAll: false, hideDone: false };
+var _snapPending = {}; // blank task lines the user has added but not yet filled in
+var _snapExpanded = {}; // item ids the user has expanded (Delivered rows are collapsed by default)
 var SNAP_COLS = ['', '', 'Product', 'Delivery Date', 'Status', 'Reason for Delay', 'Task', 'Done', 'Assigned To', 'Task Due'];
-function taskIsUrgent(item) {
-  if (!item || !item.task_due_date || item.task_completed) return false;
-  if (!item.task_text && !item.task_assignee) return false;
-  return daysBetween(todayISO(), item.task_due_date) <= TASK_ALERT_DAYS;
+function newTaskId() { return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+// An item holds a list of tasks: item.tasks = [{id,text,assignee,due,done,done_date}].
+// Older single-task data (task_text etc.) is read as a one-task list.
+function itemTasks(item) {
+  if (item && Array.isArray(item.tasks) && item.tasks.length) return item.tasks;
+  if (item && (item.task_text || item.task_assignee || item.task_due_date)) {
+    return [{ id: 'lg' + item.id, text: item.task_text || '', assignee: item.task_assignee || '', due: item.task_due_date || '', done: !!item.task_completed, done_date: item.task_completed_date || '' }];
+  }
+  return [];
+}
+function taskUrgent(t) {
+  if (!t || t.done || !t.due) return false;
+  if (!t.text && !t.assignee) return false;
+  return daysBetween(todayISO(), t.due) <= TASK_ALERT_DAYS;
+}
+function taskIsUrgent(item) { return itemTasks(item).some(taskUrgent); }
+function itemTasksHtml(i) {
+  var list = itemTasks(i);
+  if (!list.length) return '';
+  return list.map(function (t) {
+    var urgent = taskUrgent(t);
+    return '<div class="detail-item" style="grid-column:1/-1;"><div class="k">Task' + (t.done ? ' (completed)' : '') + '</div><div class="v' + (t.done ? ' task-done-text' : '') + '" style="white-space:pre-wrap;">' + esc(t.text) +
+      '<span class="muted" style="font-size:0.76rem;"> &nbsp;&middot;&nbsp; ' + (esc(t.assignee) || 'unassigned') + ' &nbsp;&middot;&nbsp; due </span><span' + (urgent ? ' style="color:#b91c1c;font-weight:700;"' : ' class="muted" style="font-size:0.76rem;"') + '>' + fmtDate(t.due) + (urgent ? ' &#9888;' : '') + '</span></div></div>';
+  }).join('');
+}
+function taskLineHtml(t) {
+  return '<div class="note-line task-line" data-tid="' + esc(t.id || '') + '" data-done-date="' + esc(t.done_date || '') + '">' +
+    '<textarea class="tl-text" placeholder="Task">' + esc(t.text || '') + '</textarea>' +
+    '<input type="text" class="tl-assignee" list="assignee-list" placeholder="Assign to" value="' + esc(t.assignee || '') + '" />' +
+    '<input type="date" class="tl-due" value="' + esc(t.due || '') + '" />' +
+    '<label class="tl-donelbl"><input type="checkbox" class="tl-done" ' + (t.done ? 'checked' : '') + ' /> Done</label>' +
+    '<button type="button" class="btn btn-ghost btn-sm" style="color:#c00;" title="Remove task" onclick="this.parentNode.remove()">&#10005;</button>' +
+  '</div>';
+}
+function renderTaskLines(list) {
+  document.getElementById('if-tasks-lines').innerHTML = list.map(taskLineHtml).join('');
+}
+function addTaskLine() {
+  var div = document.createElement('div');
+  div.innerHTML = taskLineHtml({ id: '', text: '', assignee: '', due: '', done: false });
+  document.getElementById('if-tasks-lines').appendChild(div.firstChild);
+}
+function collectTaskLines() {
+  return Array.prototype.map.call(document.querySelectorAll('#if-tasks-lines .task-line'), function (row) {
+    var done = row.querySelector('.tl-done').checked;
+    return { id: row.getAttribute('data-tid') || newTaskId(), text: row.querySelector('.tl-text').value.trim(), assignee: row.querySelector('.tl-assignee').value.trim(), due: row.querySelector('.tl-due').value || '', done: done, done_date: done ? (row.getAttribute('data-done-date') || todayISO()) : '' };
+  }).filter(function (t) { return t.text || t.assignee || t.due; });
+}
+function cloneTasks(item) { return itemTasks(item).map(function (t) { return Object.assign({}, t); }); }
+function saveItemTasks(id, tasks, done) {
+  var keep = tasks.filter(function (t) { return (t.text && String(t.text).trim()) || t.assignee || t.due; });
+  var fields = { tasks: keep, task_text: null, task_assignee: null, task_due_date: null, task_completed: false, task_completed_date: null };
+  // apply locally straight away so quick successive edits build on each other instead of overwriting
+  [window._allItemsCache, window._snapItems].forEach(function (arr) { (arr || []).forEach(function (x) { if (x.id === id) { for (var k in fields) x[k] = fields[k]; } }); });
+  return saveItemFields(id, fields, done);
+}
+function snapTasksForDisplay(i) {
+  var list = itemTasks(i).slice();
+  var pend = _snapPending[i.id] || [];
+  var out = list.filter(function (t) {
+    if (snapFilter.hideDone && t.done) return false;
+    if (snapFilter.attention && !taskUrgent(t)) return false;
+    return true;
+  });
+  if (!snapFilter.attention) out = out.concat(pend);
+  return out;
 }
 function installDateFor(item) {
   var arr = window._snapProjects || window._allProjectsCache || [];
@@ -1678,7 +1774,7 @@ function saveDelayPrompt() {
 }
 function fillAssigneeList() {
   var names = {};
-  (window._snapItems || []).concat(window._allItemsCache || []).forEach(function (x) { if (x.task_assignee) names[x.task_assignee] = 1; });
+  (window._snapItems || []).concat(window._allItemsCache || []).forEach(function (x) { itemTasks(x).forEach(function (t) { if (t.assignee) names[t.assignee] = 1; }); });
   var html = Object.keys(names).sort().map(function (n) { return '<option value="' + esc(n) + '">'; }).join('');
   ['assignee-list', 'snap-assignee-list'].forEach(function (id) { var el = document.getElementById(id); if (el) el.innerHTML = html; });
 }
@@ -1692,33 +1788,93 @@ function showSnapshot() {
     renderSnapshot();
   }).catch(function (e) { toast('Load failed: ' + e.message, 'error'); });
 }
+function snapIsCollapsed(i) {
+  if (snapFilter.expandAll) return false;
+  return deliveryState(i) === 'Delivered' && !_snapExpanded[i.id] && !taskIsUrgent(i);
+}
+function snapToggleCellHtml(i) {
+  if (deliveryState(i) !== 'Delivered') return '<td></td>';
+  var collapsed = snapIsCollapsed(i);
+  return '<td><button type="button" class="snap-toggle" title="' + (collapsed ? 'Show details' : 'Collapse') + '" onclick="snapToggle(\'' + i.id + '\')">' + (collapsed ? '+' : '&minus;') + '</button></td>';
+}
+function snapAddTaskBtn(i, primary) {
+  return '<button type="button" class="btn ' + (primary ? 'btn-secondary' : 'btn-ghost') + ' btn-sm snap-addtask-btn" onclick="snapTaskAdd(\'' + i.id + '\')">+ Add task</button>';
+}
+function snapTaskCellsHtml(i, t) {
+  var urgent = taskUrgent(t);
+  var rows = Math.max(2, Math.ceil(String(t.text || '').length / 26));
+  return '<td><textarea class="cell-input snap-ta' + (t.done ? ' task-done-text' : '') + '" id="tt-' + t.id + '" rows="' + rows + '" style="min-width:210px;" data-id="' + i.id + '" data-tid="' + t.id + '" data-f="text" placeholder="Task" oninput="autosizeTa(this)" onchange="snapTaskEdit(this)">' + esc(t.text || '') + '</textarea></td>' +
+    '<td style="text-align:center;white-space:nowrap;"><input type="checkbox" id="tk-' + t.id + '" data-id="' + i.id + '" data-tid="' + t.id + '" title="Mark task completed" style="width:auto;" ' + (t.done ? 'checked' : '') + ' onchange="snapTaskDone(this)" /> <button type="button" class="snap-del" title="Delete task" data-id="' + i.id + '" data-tid="' + t.id + '" onclick="snapTaskDelete(this)">&#10005;</button></td>' +
+    '<td><input type="text" class="cell-input" id="ta-' + t.id + '" data-id="' + i.id + '" data-tid="' + t.id + '" data-f="assignee" list="snap-assignee-list" value="' + esc(t.assignee || '') + '" placeholder="Assign to" onchange="snapTaskEdit(this)" /></td>' +
+    '<td><input type="date" class="cell-input' + (urgent ? ' due-red' : '') + '" id="td-' + t.id + '" data-id="' + i.id + '" data-tid="' + t.id + '" data-f="due" value="' + esc(t.due || '') + '" onchange="snapTaskEdit(this)" /></td>';
+}
 function snapItemRowHtml(i) {
-  var st = deliveryState(i), urgent = taskIsUrgent(i);
+  var st = deliveryState(i), delivered = st === 'Delivered';
   var stOpts = ['On Target', 'Delayed', 'Delivered'].map(function (o) { return '<option' + (o === st ? ' selected' : '') + '>' + o + '</option>'; }).join('');
   var rows = function (txt, per) { return Math.max(2, Math.ceil(String(txt || '').length / per)); };
-  return '<tr id="sr-' + i.id + '" class="' + (urgent ? 'snap-late' : '') + '">' +
-    '<td></td><td></td>' +
+  var common =
     '<td>' + esc(i.description) + '</td>' +
     '<td><input type="date" class="cell-input" data-id="' + i.id + '" data-f="required_delivery" value="' + esc(i.required_delivery || '') + '" onchange="snapItemEdit(this)" /></td>' +
-    '<td><select class="cell-input" id="ss-' + i.id + '" data-id="' + i.id + '" onchange="snapStateEdit(this)">' + stOpts + '</select></td>' +
-    '<td><textarea class="cell-input snap-ta' + (needsDelayReason(i) ? ' need-reason' : '') + '" id="sx-' + i.id + '" rows="' + rows(i.delay_reason, 22) + '" style="min-width:150px;" data-id="' + i.id + '" data-f="delay_reason" placeholder="' + (st === 'Delayed' ? 'Enter reason for delay' : '') + '" oninput="autosizeTa(this)" onchange="snapItemEdit(this)">' + esc(i.delay_reason || '') + '</textarea></td>' +
-    '<td><textarea class="cell-input snap-ta" id="st-' + i.id + '" rows="' + rows(i.task_text, 26) + '" style="min-width:210px;" data-id="' + i.id + '" data-f="task_text" placeholder="Create task" oninput="autosizeTa(this)" onchange="snapItemEdit(this)">' + esc(i.task_text || '') + '</textarea></td>' +
-    '<td style="text-align:center;"><input type="checkbox" id="sk-' + i.id + '" data-id="' + i.id + '" title="Mark task completed" style="width:auto;" ' + (i.task_completed ? 'checked' : '') + ' onchange="snapTaskDone(this)" /></td>' +
-    '<td><input type="text" class="cell-input" data-id="' + i.id + '" data-f="task_assignee" list="snap-assignee-list" value="' + esc(i.task_assignee || '') + '" placeholder="Assign to" onchange="snapItemEdit(this)" /></td>' +
-    '<td><input type="date" class="cell-input' + (urgent ? ' due-red' : '') + '" id="sd-' + i.id + '" data-id="' + i.id + '" data-f="task_due_date" value="' + esc(i.task_due_date || '') + '" onchange="snapItemEdit(this)" /></td>' +
-    '</tr>';
+    '<td><select class="cell-input" id="ss-' + i.id + '" data-id="' + i.id + '" onchange="snapStateEdit(this)">' + stOpts + '</select></td>';
+  var all = itemTasks(i);
+  if (snapIsCollapsed(i)) {
+    return '<tr id="sr-' + i.id + '" data-item="' + i.id + '" class="snap-collapsed">' + snapToggleCellHtml(i) + '<td></td>' + common +
+      '<td></td><td colspan="4">' + (all.length
+        ? '<button type="button" class="btn btn-ghost btn-sm" onclick="snapToggle(\'' + i.id + '\',true)">View tasks (' + all.length + ')</button>'
+        : snapAddTaskBtn(i, true)) + '</td></tr>';
+  }
+  var reasonCell = delivered
+    ? '<td class="muted">&mdash;</td>'
+    : '<td><textarea class="cell-input snap-ta' + (needsDelayReason(i) ? ' need-reason' : '') + '" id="sx-' + i.id + '" rows="' + rows(i.delay_reason, 22) + '" style="min-width:150px;" data-id="' + i.id + '" data-f="delay_reason" placeholder="' + (st === 'Delayed' ? 'Enter reason for delay' : '') + '" oninput="autosizeTa(this)" onchange="snapItemEdit(this)">' + esc(i.delay_reason || '') + '</textarea></td>';
+  var vis = snapTasksForDisplay(i);
+  var hiddenDone = snapFilter.hideDone ? all.filter(function (t) { return t.done; }).length : 0;
+  var out = '<tr id="sr-' + i.id + '" data-item="' + i.id + '"' + (vis[0] ? ' data-tid="' + vis[0].id + '"' : '') + ' class="' + (vis[0] && taskUrgent(vis[0]) ? 'snap-late' : '') + '">' + snapToggleCellHtml(i) + '<td></td>' + common + reasonCell +
+    (vis[0] ? snapTaskCellsHtml(i, vis[0]) : '<td colspan="4">' + (hiddenDone ? '<span class="muted" style="font-size:0.72rem;margin-right:8px;">' + hiddenDone + ' completed task(s) hidden</span>' : '') + snapAddTaskBtn(i, true) + '</td>') + '</tr>';
+  vis.slice(1).forEach(function (t) {
+    out += '<tr data-item="' + i.id + '" data-tid="' + t.id + '" class="' + (taskUrgent(t) ? 'snap-late' : '') + '"><td colspan="6"></td>' + snapTaskCellsHtml(i, t) + '</tr>';
+  });
+  if (vis.length) out += '<tr data-item="' + i.id + '" class="snap-addrow"><td colspan="6"></td><td colspan="4">' + snapAddTaskBtn(i, false) + (hiddenDone ? '<span class="muted" style="font-size:0.72rem;margin-left:8px;">' + hiddenDone + ' completed task(s) hidden</span>' : '') + '</td></tr>';
+  return out;
+}
+function snapReplaceRow(id) {
+  var it = findCachedItem(id);
+  var old = Array.prototype.slice.call(document.querySelectorAll('tr[data-item="' + id + '"]'));
+  if (!it || !old.length) return;
+  var tmp = document.createElement('tbody');
+  tmp.innerHTML = snapFilter.mode === 'report' ? snapItemReportRowHtml(it) : snapItemRowHtml(it);
+  var first = old[0];
+  Array.prototype.slice.call(tmp.children).forEach(function (tr) { first.parentNode.insertBefore(tr, first); });
+  Array.prototype.forEach.call(old, function (tr) { tr.remove(); });
+  autosizeAllTa();
+}
+function snapToggle(id, focusTask) {
+  var it = findCachedItem(id); if (!it) return;
+  _snapExpanded[id] = focusTask ? true : snapIsCollapsed(it);
+  snapReplaceRow(id);
+  if (focusTask) { var el = document.querySelector('tr[data-item="' + id + '"] textarea[data-tid]'); if (el && el.focus) el.focus(); }
+}
+function snapReportTaskCells(t) {
+  var urgent = taskUrgent(t);
+  return '<td class="rpt-wrap' + (t.done ? ' task-done-text' : '') + '">' + (esc(t.text) || '&mdash;') + '</td>' +
+    '<td style="text-align:center;">' + (t.done ? '&#10003;' : '&mdash;') + '</td>' +
+    '<td>' + (esc(t.assignee) || '&mdash;') + '</td>' +
+    '<td' + (urgent ? ' class="rpt-late"' : '') + '>' + fmtDate(t.due) + (urgent ? ' &#9888;' : '') + '</td>';
 }
 function snapItemReportRowHtml(i) {
-  var st = deliveryState(i), urgent = taskIsUrgent(i);
-  return '<tr class="' + (urgent ? 'snap-late' : '') + '"><td></td><td></td>' +
+  var st = deliveryState(i);
+  if (snapIsCollapsed(i)) {
+    return '<tr id="sr-' + i.id + '" data-item="' + i.id + '" class="snap-collapsed">' + snapToggleCellHtml(i) + '<td></td>' +
+      '<td>' + esc(i.description) + '</td><td>' + fmtDate(i.required_delivery) + '</td><td>' + statusBadge(st) + '</td><td colspan="5"></td></tr>';
+  }
+  var vis = snapTasksForDisplay(i).filter(function (t) { return t.text || t.assignee || t.due; });
+  var out = '<tr id="sr-' + i.id + '" data-item="' + i.id + '" class="' + (vis[0] && taskUrgent(vis[0]) ? 'snap-late' : '') + '">' + snapToggleCellHtml(i) + '<td></td>' +
     '<td>' + esc(i.description) + '</td>' +
     '<td>' + fmtDate(i.required_delivery) + '</td>' +
     '<td>' + statusBadge(st) + '</td>' +
-    '<td class="rpt-wrap">' + (esc(i.delay_reason) || (st === 'Delayed' ? '<span class="rpt-late">Reason needed</span>' : '&mdash;')) + '</td>' +
-    '<td class="rpt-wrap' + (i.task_completed ? ' task-done-text' : '') + '">' + (esc(i.task_text) || '&mdash;') + '</td>' +
-    '<td style="text-align:center;">' + (i.task_text ? (i.task_completed ? '&#10003;' : '&mdash;') : '') + '</td>' +
-    '<td>' + (esc(i.task_assignee) || '&mdash;') + '</td>' +
-    '<td' + (urgent ? ' class="rpt-late"' : '') + '>' + fmtDate(i.task_due_date) + (urgent ? ' &#9888;' : '') + '</td></tr>';
+    '<td class="rpt-wrap">' + (st === 'Delivered' ? '&mdash;' : (esc(i.delay_reason) || (st === 'Delayed' ? '<span class="rpt-late">Reason needed</span>' : '&mdash;'))) + '</td>' +
+    (vis[0] ? snapReportTaskCells(vis[0]) : '<td class="rpt-wrap">&mdash;</td><td></td><td></td><td></td>') + '</tr>';
+  vis.slice(1).forEach(function (t) { out += '<tr data-item="' + i.id + '" class="' + (taskUrgent(t) ? 'snap-late' : '') + '"><td colspan="6"></td>' + snapReportTaskCells(t) + '</tr>'; });
+  return out;
 }
 function snapColsRowHtml() {
   return '<tr class="snap-cols">' + SNAP_COLS.map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr>';
@@ -1757,11 +1913,17 @@ function exportSnapshotPDF() {
     doc.setFontSize(8.5); doc.text('Generated ' + fmtDatePlain(todayISO()) + '  \u00b7  ' + blocks.length + ' project(s)  \u00b7  open tasks due within ' + TASK_ALERT_DAYS + ' days or overdue are shown in red', 28, 44);
     var y = 58;
     blocks.forEach(function (b) {
-      var p = b.project;
-      var body = b.items.length ? b.items.map(function (i) {
+      var p = b.project, body = [];
+      b.items.forEach(function (i) {
         var st = deliveryState(i);
-        return [i.description || '', fmtDatePlain(i.required_delivery), st, i.delay_reason || (st === 'Delayed' ? 'Reason needed' : ''), (i.task_text || '') + (i.task_completed ? '  [completed]' : ''), i.task_assignee || '', fmtDatePlain(i.task_due_date), taskIsUrgent(i)];
-      }) : [['No products yet', '', '', '', '', '', '', false]];
+        var reason = st === 'Delivered' ? '' : (i.delay_reason || (st === 'Delayed' ? 'Reason needed' : ''));
+        var tasks = snapTasksForDisplay(i).filter(function (t) { return t.text || t.assignee || t.due; });
+        if (!tasks.length) { body.push([i.description || '', fmtDatePlain(i.required_delivery), st, reason, '', '', '', false]); return; }
+        tasks.forEach(function (t, k) {
+          body.push([k === 0 ? (i.description || '') : '', k === 0 ? fmtDatePlain(i.required_delivery) : '', k === 0 ? st : '', k === 0 ? reason : '', (t.text || '') + (t.done ? '  [completed]' : ''), t.assignee || '', fmtDatePlain(t.due), taskUrgent(t)]);
+        });
+      });
+      if (!body.length) body.push(['No products yet', '', '', '', '', '', '', false]);
       doc.autoTable({
         startY: y,
         head: [[{ content: p.site_name + (p.ref ? '  (' + p.ref + ')' : '') + '    Install date: ' + (fmtDatePlain(p.install_date) || '-') + '    Risk: ' + (p.delay_risk_status || '-'), colSpan: 7, styles: { fillColor: [26, 26, 26], textColor: 255, fontSize: 8.5 } }],
@@ -1790,7 +1952,7 @@ function renderSnapshot() {
   var urgentCount = 0, body = '';
   blocks.forEach(function (bl) {
     var p = bl.project, its = bl.items;
-    its.forEach(function (i) { if (taskIsUrgent(i)) urgentCount++; });
+    its.forEach(function (i) { urgentCount += itemTasks(i).filter(taskUrgent).length; });
     body += '<tr class="snap-proj">' +
       '<td colspan="2"><span class="link-btn" style="font-weight:700;" onclick="showProjectDetail(\'' + p.id + '\')">' + esc(p.site_name) + '</span>' + (p.ref ? '<div class="muted" style="font-size:0.7rem;">' + esc(p.ref) + '</div>' : '') + '</td>' +
       '<td class="muted" style="font-size:0.72rem;">Install date</td>' +
@@ -1813,6 +1975,8 @@ function renderSnapshot() {
     '<div class="search-wrap" style="margin-bottom:1rem;">' +
       '<input type="text" class="search-bar" id="sn-search" placeholder="Search project&hellip;" value="' + esc(snapFilter.search) + '" oninput="onSnapFilterChange(true)" />' +
       '<select class="status-filter" id="sn-state" onchange="onSnapFilterChange()"><option value="">All delivery statuses</option>' + ['On Target', 'Delayed', 'Delivered'].map(function (o) { return '<option' + (o === snapFilter.state ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select>' +
+      '<label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;"><input type="checkbox" id="sn-hidedone" ' + (snapFilter.hideDone ? 'checked' : '') + ' onchange="onSnapFilterChange()" style="width:auto;"> Hide completed tasks</label>' +
+      '<label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;"><input type="checkbox" id="sn-expand" ' + (snapFilter.expandAll ? 'checked' : '') + ' onchange="onSnapFilterChange()" style="width:auto;"> Expand delivered items</label>' +
       '<label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;"><input type="checkbox" id="sn-completed" ' + (snapFilter.showCompleted ? 'checked' : '') + ' onchange="onSnapFilterChange()" style="width:auto;"> Include completed projects</label>' +
     '</div>' +
     '<datalist id="snap-assignee-list"></datalist>' +
@@ -1825,25 +1989,71 @@ function onSnapFilterChange(keepFocus) {
   snapFilter.search = document.getElementById('sn-search').value;
   snapFilter.state = document.getElementById('sn-state').value;
   snapFilter.showCompleted = document.getElementById('sn-completed').checked;
+  snapFilter.expandAll = document.getElementById('sn-expand').checked;
+  snapFilter.hideDone = document.getElementById('sn-hidedone').checked;
   renderSnapshot();
   if (keepFocus) { var el = document.getElementById('sn-search'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
 }
 function snapRefreshRow(id) {
   var it = findCachedItem(id); if (!it) return;
-  var tr = document.getElementById('sr-' + id), urgent = taskIsUrgent(it);
-  if (tr) tr.className = urgent ? 'snap-late' : '';
-  var d = document.getElementById('sd-' + id);
-  if (d) d.className = 'cell-input' + (urgent ? ' due-red' : '');
   var st = deliveryState(it);
   var ss = document.getElementById('ss-' + id);
   if (ss) ss.value = st;
   var sx = document.getElementById('sx-' + id);
   if (sx) { sx.classList.toggle('need-reason', needsDelayReason(it)); sx.placeholder = st === 'Delayed' ? 'Enter reason for delay' : ''; }
-  var sk = document.getElementById('sk-' + id);
-  if (sk) sk.checked = !!it.task_completed;
-  var stx = document.getElementById('st-' + id);
-  if (stx) stx.classList.toggle('task-done-text', !!it.task_completed);
+  var tasks = itemTasks(it);
+  Array.prototype.forEach.call(document.querySelectorAll('tr[data-item="' + id + '"][data-tid]'), function (tr) {
+    var tid = tr.getAttribute('data-tid');
+    var t = tasks.filter(function (x) { return x.id === tid; })[0];
+    if (!t) return;
+    var urgent = taskUrgent(t);
+    tr.classList.toggle('snap-late', urgent);
+    var d = document.getElementById('td-' + tid); if (d) d.classList.toggle('due-red', urgent);
+    var k = document.getElementById('tk-' + tid); if (k) k.checked = !!t.done;
+    var x = document.getElementById('tt-' + tid); if (x) x.classList.toggle('task-done-text', !!t.done);
+  });
   fillAssigneeList();
+}
+function snapTaskEdit(el) {
+  var id = el.getAttribute('data-id'), tid = el.getAttribute('data-tid'), f = el.getAttribute('data-f');
+  var it = findCachedItem(id); if (!it) return;
+  var tasks = cloneTasks(it);
+  var t = tasks.filter(function (x) { return x.id === tid; })[0];
+  if (!t) { t = { id: tid, text: '', assignee: '', due: '', done: false, done_date: '' }; tasks.push(t); }
+  t[f] = el.value.trim();
+  saveItemTasks(id, tasks, function () {
+    _snapPending[id] = (_snapPending[id] || []).filter(function (p) { return p.id !== tid; });
+    snapRefreshRow(id);
+  });
+}
+function snapTaskDone(el) {
+  var id = el.getAttribute('data-id'), tid = el.getAttribute('data-tid');
+  var it = findCachedItem(id); if (!it) return;
+  var tasks = cloneTasks(it);
+  var t = tasks.filter(function (x) { return x.id === tid; })[0];
+  if (!t) { t = { id: tid, text: '', assignee: '', due: '', done: false, done_date: '' }; tasks.push(t); }
+  t.done = !!el.checked; t.done_date = el.checked ? todayISO() : '';
+  saveItemTasks(id, tasks, function () {
+    _snapPending[id] = (_snapPending[id] || []).filter(function (p) { return p.id !== tid; });
+    if (snapFilter.hideDone && t.done) snapReplaceRow(id); else snapRefreshRow(id);
+  });
+}
+function snapTaskAdd(id) {
+  var it = findCachedItem(id); if (!it) return;
+  var t = { id: newTaskId(), text: '', assignee: '', due: '', done: false, done_date: '' };
+  (_snapPending[id] = _snapPending[id] || []).push(t);
+  _snapExpanded[id] = true;
+  snapReplaceRow(id);
+  var el = document.getElementById('tt-' + t.id); if (el && el.focus) el.focus();
+}
+function snapTaskDelete(btn) {
+  var id = btn.getAttribute('data-id'), tid = btn.getAttribute('data-tid');
+  var it = findCachedItem(id); if (!it) return;
+  confirmDialog('Delete this task?', function () {
+    _snapPending[id] = (_snapPending[id] || []).filter(function (p) { return p.id !== tid; });
+    var tasks = cloneTasks(it).filter(function (x) { return x.id !== tid; });
+    return saveItemTasks(id, tasks, function () { snapReplaceRow(id); });
+  });
 }
 function snapItemEdit(el) {
   var id = el.getAttribute('data-id'), f = el.getAttribute('data-f');
@@ -1880,15 +2090,13 @@ function snapStateEdit(el) {
     if (it.actual_delivery && it.delivery_completion !== 'Partial') fields.actual_delivery = null;
   }
   saveItemFields(id, fields, function () {
+    _snapExpanded[id] = true; // keep the row open after a status change
+    snapReplaceRow(id);
     snapRefreshRow(id);
     if (el.value === 'Delayed' && !(it.delay_reason && String(it.delay_reason).trim())) promptDelayReason(it);
   });
 }
-function snapTaskDone(el) {
-  var id = el.getAttribute('data-id');
-  var fields = { task_completed: !!el.checked, task_completed_date: el.checked ? todayISO() : null };
-  saveItemFields(id, fields, function () { snapRefreshRow(id); });
-}
+
 function snapProjectInstallEdit(el) {
   var pid = el.getAttribute('data-pid');
   var val = el.value || null;
@@ -1902,7 +2110,10 @@ function exportSnapshotCSV() {
   var rows = [];
   (window._snapProjects || []).forEach(function (p) {
     (window._snapItems || []).filter(function (i) { return i.project_id === p.id; }).forEach(function (i) {
-      rows.push({ Project: p.site_name, InstallDate: p.install_date, Product: i.description, DeliveryDate: i.required_delivery, Status: deliveryState(i), ReasonForDelay: i.delay_reason, Task: i.task_text, TaskCompleted: i.task_completed ? 'Yes' : 'No', AssignedTo: i.task_assignee, TaskDue: i.task_due_date });
+      var base = { Project: p.site_name, InstallDate: p.install_date, Product: i.description, DeliveryDate: i.required_delivery, Status: deliveryState(i), ReasonForDelay: i.delay_reason };
+      var tasks = itemTasks(i);
+      if (!tasks.length) { rows.push(Object.assign({}, base, { Task: '', TaskCompleted: '', AssignedTo: '', TaskDue: '' })); return; }
+      tasks.forEach(function (t) { rows.push(Object.assign({}, base, { Task: t.text, TaskCompleted: t.done ? 'Yes' : 'No', AssignedTo: t.assignee, TaskDue: t.due })); });
     });
   });
   downloadCSV('eurolux-snapshot.csv', rows);
