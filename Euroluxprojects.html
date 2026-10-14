@@ -152,6 +152,19 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
 .quotes-list.static tbody tr:hover { background: inherit; }
 .quotes-list tbody tr.snap-proj { background: #f4f4f1; border-top: 2px solid #1a1a1a; }
 .quotes-list tbody tr.snap-late { background: #fef2f2; }
+.quotes-list tbody tr.snap-cols th { background: #e9e9e5; color: #333; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; padding: 0.4rem 0.9rem; white-space: nowrap; }
+.rpt-late { color: #b91c1c; font-weight: 700; }
+.mode-toggle { display: inline-flex; border: 1px solid #1a1a1a; border-radius: 6px; overflow: hidden; }
+.mode-toggle button { background: #fff; border: none; padding: 0.36rem 0.8rem; font-size: 0.72rem; font-weight: 600; cursor: pointer; font-family: var(--font-sans); }
+.mode-toggle button.on { background: #1a1a1a; color: #fff; }
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  .app-nav, .app-footer, .search-wrap, .mode-toggle, .back-link, #toast, .toast { display: none !important; }
+  .app-content { padding: 0 !important; max-width: none !important; }
+  .quotes-list { box-shadow: none; }
+  .quotes-list tbody tr { page-break-inside: avoid; }
+  .quotes-list thead tr, .quotes-list tbody tr.snap-cols th, .quotes-list tbody tr.snap-proj, .quotes-list tbody tr.snap-late { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
 .snap-flag { color: #b91c1c; font-weight: 700; font-size: 0.68rem; }
 .note-line { display: flex; gap: 6px; align-items: flex-start; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #e5e5e5; }
 .note-line input[type=date] { width: 140px; flex: none; }
@@ -302,7 +315,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
     </div>
     <button class="nav-btn" data-route="dashboard" onclick="showDashboard()">Dashboard</button>
     <button class="nav-btn" data-route="projects" onclick="showProjects()">Projects</button>
-    <button class="nav-btn" data-route="snapshot" onclick="showSnapshot()">Snapshot</button>
+    <button class="nav-btn" data-route="snapshot" onclick="showSnapshot()">Snapshot Report</button>
     <button class="nav-btn" data-route="deliveries" onclick="showDeliveries()">Deliveries</button>
     <button class="nav-btn" data-route="reports" onclick="showReports()">Reports</button>
     <button class="nav-btn" data-route="admin" onclick="showAdmin()">Reference Data</button>
@@ -1593,7 +1606,8 @@ function deleteItemConfirm(id, desc) {
 // SNAPSHOT (project / product delivery overview + tasks)
 // ============================================
 var TASK_ALERT_DAYS = 10; // tasks due within this many days (or overdue) show in red
-var snapFilter = { search: '', state: '', showCompleted: false };
+var snapFilter = { search: '', state: '', showCompleted: false, mode: 'edit' };
+var SNAP_COLS = ['', '', 'Product', 'Delivery Date', 'Status', 'Task', 'Assigned To', 'Task Due'];
 function taskIsUrgent(item) {
   if (!item || !item.task_due_date) return false;
   if (!item.task_text && !item.task_assignee) return false;
@@ -1635,7 +1649,21 @@ function snapItemRowHtml(i) {
     '<td><input type="date" class="cell-input' + (urgent ? ' due-red' : '') + '" id="sd-' + i.id + '" data-id="' + i.id + '" data-f="task_due_date" value="' + esc(i.task_due_date || '') + '" onchange="snapItemEdit(this)" /></td>' +
     '</tr>';
 }
-function renderSnapshot() {
+function snapItemReportRowHtml(i) {
+  var st = deliveryState(i), urgent = taskIsUrgent(i);
+  return '<tr class="' + (urgent ? 'snap-late' : '') + '"><td></td><td></td>' +
+    '<td>' + esc(i.description) + '</td>' +
+    '<td>' + fmtDate(i.required_delivery) + '</td>' +
+    '<td>' + statusBadge(st) + '</td>' +
+    '<td>' + (esc(i.task_text) || '&mdash;') + '</td>' +
+    '<td>' + (esc(i.task_assignee) || '&mdash;') + '</td>' +
+    '<td' + (urgent ? ' class="rpt-late"' : '') + '>' + fmtDate(i.task_due_date) + (urgent ? ' &#9888;' : '') + '</td></tr>';
+}
+function snapColsRowHtml() {
+  return '<tr class="snap-cols">' + SNAP_COLS.map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr>';
+}
+function setSnapMode(m) { snapFilter.mode = m; renderSnapshot(); }
+function snapVisibleBlocks() {
   var projects = (window._snapProjects || []).slice();
   var items = window._snapItems || [];
   var q = snapFilter.search.toLowerCase();
@@ -1644,26 +1672,80 @@ function renderSnapshot() {
     if (q && (p.site_name || '').toLowerCase().indexOf(q) === -1 && (p.ref || '').toLowerCase().indexOf(q) === -1) return false;
     return true;
   });
-  var urgentCount = 0, body = '';
+  var blocks = [];
   projects.forEach(function (p) {
     var its = items.filter(function (i) { return i.project_id === p.id; });
     if (snapFilter.state) its = its.filter(function (i) { return deliveryState(i) === snapFilter.state; });
     if (snapFilter.state && !its.length) return;
     its.sort(function (a, b) { return (a.required_delivery || '9999').localeCompare(b.required_delivery || '9999'); });
+    blocks.push({ project: p, items: its });
+  });
+  return blocks;
+}
+function exportSnapshotPDF() {
+  var blocks = snapVisibleBlocks();
+  if (!blocks.length) { toast('Nothing to export', 'error'); return; }
+  var pdfReady = typeof window.jspdf !== 'undefined' && typeof window.jspdf.jsPDF === 'function';
+  var autoTableReady = pdfReady && typeof (new window.jspdf.jsPDF()).autoTable === 'function';
+  if (!pdfReady || !autoTableReady) { toast('PDF export library failed to load — check your connection and try again', 'error'); return; }
+  try {
+    var doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    doc.setFontSize(14); doc.text('Eurolux Snapshot Report', 28, 30);
+    doc.setFontSize(8.5); doc.text('Generated ' + fmtDatePlain(todayISO()) + '  ·  ' + blocks.length + ' project(s)  ·  tasks due within ' + TASK_ALERT_DAYS + ' days or overdue are shown in red', 28, 44);
+    var y = 58;
+    blocks.forEach(function (b) {
+      var p = b.project;
+      var body = b.items.length ? b.items.map(function (i) {
+        return [i.description || '', fmtDatePlain(i.required_delivery), deliveryState(i), i.task_text || '', i.task_assignee || '', fmtDatePlain(i.task_due_date), taskIsUrgent(i)];
+      }) : [['No products yet', '', '', '', '', '', false]];
+      doc.autoTable({
+        startY: y,
+        head: [[{ content: p.site_name + (p.ref ? '  (' + p.ref + ')' : '') + '    Install date: ' + (fmtDatePlain(p.install_date) || '-') + '    Risk: ' + (p.delay_risk_status || '-'), colSpan: 6, styles: { fillColor: [26, 26, 26], textColor: 255, fontSize: 8.5 } }],
+               ['Product', 'Delivery Date', 'Status', 'Task', 'Assigned To', 'Task Due']],
+        body: body.map(function (r) { return r.slice(0, 6); }),
+        styles: { fontSize: 7.5, cellPadding: 3.5, overflow: 'linebreak' },
+        headStyles: { fillColor: [233, 233, 229], textColor: 40 },
+        columnStyles: { 0: { cellWidth: 200 }, 1: { cellWidth: 70 }, 2: { cellWidth: 60 }, 3: { cellWidth: 200 }, 4: { cellWidth: 90 }, 5: { cellWidth: 70 } },
+        margin: { left: 28, right: 28 },
+        didParseCell: function (data) {
+          if (data.section === 'head' && data.row.index === 0) return;
+          if (data.section === 'body' && body[data.row.index] && body[data.row.index][6]) {
+            data.cell.styles.fillColor = [254, 226, 226];
+            if (data.column.index === 5) { data.cell.styles.textColor = [185, 28, 28]; data.cell.styles.fontStyle = 'bold'; }
+          }
+        }
+      });
+      y = doc.lastAutoTable.finalY + 12;
+    });
+    doc.save('eurolux-snapshot-report.pdf');
+  } catch (e) { toast('PDF export failed: ' + e.message, 'error'); }
+}
+function renderSnapshot() {
+  var blocks = snapVisibleBlocks();
+  var report = snapFilter.mode === 'report';
+  var urgentCount = 0, body = '';
+  blocks.forEach(function (bl) {
+    var p = bl.project, its = bl.items;
     its.forEach(function (i) { if (taskIsUrgent(i)) urgentCount++; });
     body += '<tr class="snap-proj">' +
       '<td colspan="2"><span class="link-btn" style="font-weight:700;" onclick="showProjectDetail(\'' + p.id + '\')">' + esc(p.site_name) + '</span>' + (p.ref ? '<div class="muted" style="font-size:0.7rem;">' + esc(p.ref) + '</div>' : '') + '</td>' +
       '<td class="muted" style="font-size:0.72rem;">Install date</td>' +
-      '<td><input type="date" class="cell-input" data-pid="' + p.id + '" value="' + esc(p.install_date || '') + '" onchange="snapProjectInstallEdit(this)" /></td>' +
+      '<td>' + (report ? '<strong>' + fmtDate(p.install_date) + '</strong>' : '<input type="date" class="cell-input" data-pid="' + p.id + '" value="' + esc(p.install_date || '') + '" onchange="snapProjectInstallEdit(this)" />') + '</td>' +
       '<td colspan="4">' + statusBadge(p.delay_risk_status) + ' <span class="muted" style="font-size:0.72rem;margin-left:6px;">' + its.length + ' product(s)</span></td></tr>';
+    body += snapColsRowHtml();
     if (!its.length) body += '<tr><td></td><td></td><td colspan="6" class="muted">No products yet</td></tr>';
-    body += its.map(snapItemRowHtml).join('');
+    body += its.map(report ? snapItemReportRowHtml : snapItemRowHtml).join('');
   });
-  var table = body ? '<table class="quotes-list static"><thead><tr><th colspan="2">Project</th><th>Product</th><th>Delivery Date</th><th>Status</th><th>Task</th><th>Assigned To</th><th>Task Due</th></tr></thead><tbody>' + body + '</tbody></table>'
+  var table = body ? '<table class="quotes-list static"><tbody>' + body + '</tbody></table>'
     : '<div class="empty-state"><div class="icon">&#128203;</div><h3>Nothing to show</h3></div>';
   render(
-    '<div class="dashboard-header"><div>' + backButtonHtml() + '<h1>Snapshot</h1><p>Every project and product at a glance &mdash; edit here and it saves to the main screens. Tasks due within ' + TASK_ALERT_DAYS + ' days (or overdue) show in red.' + (urgentCount ? ' <strong class="snap-flag">' + urgentCount + ' task(s) need attention.</strong>' : '') + '</p></div>' +
-      '<div class="search-wrap"><button class="btn btn-secondary btn-sm" onclick="exportSnapshotCSV()">Export CSV</button></div></div>' +
+    '<div class="dashboard-header"><div>' + backButtonHtml() + '<h1>Snapshot Report</h1><p>' + (report ? 'Read-only report view &mdash; print it or download it as a PDF. ' : 'Edit here and it saves to the main screens. ') + 'Tasks due within ' + TASK_ALERT_DAYS + ' days (or overdue) show in red.' + (urgentCount ? ' <strong class="snap-flag">' + urgentCount + ' task(s) need attention.</strong>' : '') + '</p></div>' +
+      '<div class="search-wrap">' +
+        '<div class="mode-toggle"><button class="' + (report ? '' : 'on') + '" onclick="setSnapMode(\'edit\')">Edit view</button><button class="' + (report ? 'on' : '') + '" onclick="setSnapMode(\'report\')">Report view</button></div>' +
+        '<button class="btn btn-primary btn-sm" onclick="exportSnapshotPDF()">Download PDF</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="window.print()">Print</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="exportSnapshotCSV()">Export CSV</button>' +
+      '</div></div>' +
     '<div class="search-wrap" style="margin-bottom:1rem;">' +
       '<input type="text" class="search-bar" id="sn-search" placeholder="Search project&hellip;" value="' + esc(snapFilter.search) + '" oninput="onSnapFilterChange(true)" />' +
       '<select class="status-filter" id="sn-state" onchange="onSnapFilterChange()"><option value="">All delivery statuses</option>' + ['On Target', 'Delayed', 'Delivered'].map(function (o) { return '<option' + (o === snapFilter.state ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select>' +
