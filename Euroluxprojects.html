@@ -154,6 +154,14 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
 .quotes-list tbody tr.snap-late { background: #fef2f2; }
 .quotes-list tbody tr.snap-cols th { background: #e9e9e5; color: #333; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; padding: 0.4rem 0.9rem; white-space: nowrap; }
 .rpt-late { color: #b91c1c; font-weight: 700; }
+.item-collapsed { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0.6rem 1rem !important; margin-bottom: 10px; background: #fafafa; }
+.item-collapsed .t { font-weight: 600; font-size: 0.85rem; }
+.note-hide-btn { border: none; background: none; color: #666; font-size: 0.72rem; cursor: pointer; text-decoration: underline; flex: none; margin-left: 8px; }
+.notes-log-row.is-hidden { opacity: 0.5; }
+.notes-log-row.is-hidden .tx { text-decoration: line-through; }
+.note-line.is-hidden textarea { opacity: 0.5; }
+.hide-links { font-size: 0.74rem; }
+.hide-links button { margin-left: 8px; }
 .cell-input.snap-ta { resize: vertical; overflow: hidden; line-height: 1.35; font-family: inherit; white-space: pre-wrap; }
 .rpt-task { white-space: pre-wrap; word-break: break-word; }
 .task-done-text { color: #777; text-decoration: line-through; }
@@ -475,8 +483,8 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
         <div class="form-group"><label>Task Assigned To</label><input type="text" id="if-task-assignee" list="assignee-list" /></div>
         <div class="form-group"><label>Task Due Date</label><input type="date" id="if-task-due" /></div>
         <div class="form-group"><label>PO Reference</label><input type="text" id="if-po-ref" /></div>
-        <div class="form-group"><label>Approved Glass</label><input type="text" id="if-glass" list="glass-list" placeholder="Pick or type a new one" /></div>
-        <div class="form-group"><label>Glazing Type</label><input type="text" id="if-glazing" list="glazing-list" placeholder="Pick or type a new one" /></div>
+         <div class="form-group" id="if-glass-wrap" style="display:none;"><label>Approved Glass</label><input type="text" id="if-glass" list="glass-list" placeholder="Pick or type a new one" /></div>
+         <div class="form-group" id="if-glazing-wrap" style="display:none;"><label>Glazing Type</label><input type="text" id="if-glazing" list="glazing-list" placeholder="Pick or type a new one" /></div>
       </div>
       <div class="form-group full" style="margin-top:1rem;">
         <label>Notes</label>
@@ -1230,6 +1238,25 @@ function showProjectDetail(id) {
   });
 }
 
+var _showHiddenNotes = {};
+function hiddenItemSet() { try { return JSON.parse(localStorage.getItem('ppms_hidden_items') || '{}') || {}; } catch (e) { return {}; } }
+function isItemHidden(id) { return !!hiddenItemSet()[id]; }
+function setItemHidden(id, on) {
+  var set = hiddenItemSet();
+  if (on) set[id] = 1; else delete set[id];
+  try { localStorage.setItem('ppms_hidden_items', JSON.stringify(set)); } catch (e) {}
+}
+function rerenderProject() {
+  var y = window.scrollY || 0;
+  renderProjectDetail(window.currentProjectData, currentProjectItems);
+  try { window.scrollTo(0, y); } catch (e) {}
+}
+function toggleItemHidden(id) { setItemHidden(id, !isItemHidden(id)); rerenderProject(); }
+function setAllItemsHidden(on) { (currentProjectItems || []).forEach(function (i) { setItemHidden(i.id, on); }); rerenderProject(); }
+function isGlassCategory(categoryId) {
+  var c = cache.categories.filter(function (x) { return x.id === categoryId; })[0];
+  return !!c && String(c.name).trim().toLowerCase() === 'glass';
+}
 function renderProjectDetail(project, items) {
   currentProjectItems = items;
   var progress = projectProgress(project, items);
@@ -1262,12 +1289,17 @@ function renderProjectDetail(project, items) {
       return '<div style="font-weight:700;font-size:0.85rem;margin:1.1rem 0 0.6rem;display:flex;justify-content:space-between;">' + esc(cat) + '<span class="muted" style="font-weight:500;">' + fmt(catTotal) + '</span></div>' +
         catItems.map(function (i) {
           var risk = itemRisk(i);
+          if (isItemHidden(i.id)) {
+            return '<div class="section-card item-collapsed"><div><span class="t">' + esc(i.description) + '</span> ' + statusBadge(i.item_status) + (risk.label ? '<span class="risk-flag ' + risk.level + '">' + risk.label + '</span>' : '') +
+              '<span class="muted" style="font-size:0.76rem;margin-left:10px;">' + (i.total_cost != null ? fmt(i.total_cost) : '') + '</span></div>' +
+              '<button class="btn btn-ghost btn-sm" onclick="toggleItemHidden(\'' + i.id + '\')">Show</button></div>';
+          }
           return '<div class="section-card" style="margin-bottom:10px;">' +
             '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">' +
               '<div><div style="font-weight:700;">' + esc(i.description) + '</div>' +
                 '<div style="margin-top:4px;">' + statusBadge(i.item_status) + (risk.label ? '<span class="risk-flag ' + risk.level + '">' + risk.label + '</span>' : '') + '</div>' +
               '</div>' +
-              '<div style="white-space:nowrap;"><button class="btn btn-ghost btn-sm" onclick="editItemFormById(\'' + i.id + '\')">Edit</button> <button class="btn btn-ghost btn-sm" style="color:#c00;" onclick="deleteItemConfirm(\'' + i.id + '\',\'' + esc(i.description).replace(/'/g, "\\'") + '\')">Del</button></div>' +
+              '<div style="white-space:nowrap;"><button class="btn btn-ghost btn-sm" onclick="toggleItemHidden(\'' + i.id + '\')">Hide</button> <button class="btn btn-ghost btn-sm" onclick="editItemFormById(\'' + i.id + '\')">Edit</button> <button class="btn btn-ghost btn-sm" style="color:#c00;" onclick="deleteItemConfirm(\'' + i.id + '\',\'' + esc(i.description).replace(/'/g, "\\'") + '\')">Del</button></div>' +
             '</div>' +
             '<div class="detail-grid" style="margin-top:12px;">' +
               '<div class="detail-item"><div class="k">Category</div><div class="v">' + esc(categoryName(i.category_id)) + '</div></div>' +
@@ -1280,15 +1312,15 @@ function renderProjectDetail(project, items) {
               '<div class="detail-item"><div class="k">Required Delivery</div><div class="v">' + fmtDate(i.required_delivery) + '</div></div>' +
               '<div class="detail-item"><div class="k">Actual Delivery</div><div class="v">' + fmtDate(i.actual_delivery) + '</div></div>' +
               '<div class="detail-item"><div class="k">PO Reference</div><div class="v">' + (esc(i.po_ref) || '&mdash;') + '</div></div>' +
-              '<div class="detail-item"><div class="k">Approved Glass</div><div class="v">' + (esc(i.approved_glass) || '&mdash;') + '</div></div>' +
-              '<div class="detail-item"><div class="k">Glazing Type</div><div class="v">' + (esc(i.glazing_type) || '&mdash;') + '</div></div>' +
+              (isGlassCategory(i.category_id) ? '<div class="detail-item"><div class="k">Approved Glass</div><div class="v">' + (esc(i.approved_glass) || '&mdash;') + '</div></div>' +
+              '<div class="detail-item"><div class="k">Glazing Type</div><div class="v">' + (esc(i.glazing_type) || '&mdash;') + '</div></div>' : '') +
               (i.delivery_completion ? '<div class="detail-item"><div class="k">Delivery Completed</div><div class="v">' + esc(i.delivery_completion) + '</div></div>' : '') +
               (i.delivered_details ? '<div class="detail-item"><div class="k">What Was Delivered</div><div class="v">' + esc(i.delivered_details) + '</div></div>' : '') +
               (i.task_text ? '<div class="detail-item"><div class="k">Task' + (i.task_completed ? ' (completed ' + fmtDatePlain(i.task_completed_date) + ')' : '') + '</div><div class="v' + (i.task_completed ? ' task-done-text' : '') + '" style="white-space:pre-wrap;">' + esc(i.task_text) + '</div></div><div class="detail-item"><div class="k">Assigned To</div><div class="v">' + (esc(i.task_assignee) || '&mdash;') + '</div></div><div class="detail-item"><div class="k">Task Due</div><div class="v"' + (taskIsUrgent(i) ? ' style="color:#b91c1c;font-weight:700;"' : '') + '>' + fmtDate(i.task_due_date) + (taskIsUrgent(i) ? ' &#9888;' : '') + '</div></div>' : '') +
               (i.sorex_required ? '<div class="detail-item"><div class="k">SOREX Required</div><div class="v">' + esc(i.sorex_required) + '</div></div>' : '') +
               (i.winhaus_lock_position ? '<div class="detail-item"><div class="k">WINHAUS Lock Position</div><div class="v">' + esc(i.winhaus_lock_position) + '</div></div>' : '') +
             '</div>' +
-            notesLogHtml(i, 'Notes', 10) +
+            notesLogHtml(i, 'Notes', 10, 'i') +
           '</div>';
         }).join('');
     }).join('') + '<div style="text-align:right;font-weight:700;padding:10px 4px;">Project Total: ' + fmt(totalCost) + '</div>';
@@ -1326,9 +1358,10 @@ function renderProjectDetail(project, items) {
       '<div style="margin-top:12px;"><div class="detail-item k">Installation Progress &mdash; ' + progress.pct + '%</div><div class="progress-bar" style="margin-top:6px;"><div style="width:' + progress.pct + '%"></div></div><div class="muted" style="font-size:0.72rem;margin-top:3px;">' + esc(progress.basis) + '</div></div>' +
       (project.risk_mitigation_notes ? '<div style="margin-top:14px;"><div class="detail-item k">Risk Mitigation Notes</div><div style="margin-top:4px;white-space:pre-wrap;font-size:0.82rem;">' + nl2br(project.risk_mitigation_notes) + '</div></div>' : '') +
       (project.scope_text ? '<div style="margin-top:14px;"><div class="detail-item k">Project Scope</div><div style="margin-top:4px;white-space:pre-wrap;font-size:0.82rem;">' + nl2br(project.scope_text) + '</div></div>' : '') +
-      notesLogHtml(project) +
+      notesLogHtml(project, 'Project Notes', 14, 'p') +
     '</div>' +
-    '<div class="sec-title" style="font-weight:700;margin:1.2rem 0 0.6rem;">Procurement Items (' + items.length + ')</div>' +
+    '<div class="sec-title" style="font-weight:700;margin:1.2rem 0 0.6rem;display:flex;justify-content:space-between;align-items:center;">Procurement Items (' + items.length + ')' +
+      (items.length ? '<span class="hide-links"><button class="link-btn" onclick="setAllItemsHidden(true)">Hide all</button><button class="link-btn" onclick="setAllItemsHidden(false)">Show all</button></span>' : '') + '</div>' +
     '<div id="project-tab-body">' + itemsTabHtml + '</div>' +
     '<div style="text-align:right;margin-top:12px;"><button class="btn btn-secondary btn-sm" onclick="exportItemsCSV()">Export Items CSV</button> <button class="btn btn-primary btn-sm" onclick="openItemForm(null)">+ Add Item</button></div>'
   );
@@ -1381,12 +1414,19 @@ function notesToPlain(entries) {
   return entries.length ? entries.map(function (n) { return (n.date ? fmtDatePlain(n.date) + ': ' : '') + n.text; }).join('\n') : null;
 }
 function noteLineHtml(n) {
-  return '<div class="note-line">' +
+  return '<div class="note-line' + (n.hidden ? ' is-hidden' : '') + '" data-hidden="' + (n.hidden ? '1' : '') + '">' +
     '<input type="date" class="nl-date" value="' + esc(n.date || '') + '" />' +
     '<button type="button" class="btn btn-ghost btn-sm" title="Use today\'s date" onclick="this.parentNode.querySelector(\'.nl-date\').value=todayISO()">Today</button>' +
     '<textarea class="nl-text" placeholder="Note">' + esc(n.text || '') + '</textarea>' +
+    '<button type="button" class="btn btn-ghost btn-sm nl-hide-btn" title="Hide or unhide this note" onclick="toggleNoteLineHidden(this)">' + (n.hidden ? 'Unhide' : 'Hide') + '</button>' +
     '<button type="button" class="btn btn-ghost btn-sm" style="color:#c00;" title="Remove line" onclick="this.parentNode.remove()">&#10005;</button>' +
   '</div>';
+}
+function toggleNoteLineHidden(btn) {
+  var row = btn.parentNode, on = row.getAttribute('data-hidden') !== '1';
+  row.setAttribute('data-hidden', on ? '1' : '');
+  row.classList.toggle('is-hidden', on);
+  btn.textContent = on ? 'Unhide' : 'Hide';
 }
 function renderNoteLines(entries, boxId) {
   var box = document.getElementById(boxId || 'pf-notes-lines');
@@ -1401,15 +1441,33 @@ function addNoteLine(boxId) {
 }
 function collectNoteLines(boxId) {
   return Array.prototype.map.call(document.querySelectorAll('#' + (boxId || 'pf-notes-lines') + ' .note-line'), function (row) {
-    return { date: row.querySelector('.nl-date').value || '', text: row.querySelector('.nl-text').value.trim() };
+    var n = { date: row.querySelector('.nl-date').value || '', text: row.querySelector('.nl-text').value.trim() };
+    if (row.getAttribute('data-hidden') === '1') n.hidden = true;
+    return n;
   }).filter(function (n) { return n.text; });
 }
-function notesLogHtml(project, label, marginTop) {
-  var entries = projectNoteEntries(project);
+function notesLogHtml(entity, label, marginTop, kind) {
+  var entries = projectNoteEntries(entity);
   if (!entries.length) return '';
-  return '<div style="margin-top:' + (marginTop || 14) + 'px;"><div class="detail-item k">' + (label || 'Project Notes') + '</div><div style="margin-top:4px;">' +
-    entries.map(function (n) { return '<div class="notes-log-row"><div class="d">' + (n.date ? fmtDate(n.date) : '&mdash;') + '</div><div style="flex:1;white-space:pre-wrap;">' + nl2br(n.text) + '</div></div>'; }).join('') +
-  '</div></div>';
+  var key = kind + ':' + entity.id, showHidden = !!_showHiddenNotes[key];
+  var hiddenCount = entries.filter(function (n) { return n.hidden; }).length;
+  var rows = entries.map(function (n, idx) {
+    if (n.hidden && !showHidden) return '';
+    return '<div class="notes-log-row' + (n.hidden ? ' is-hidden' : '') + '"><div class="d">' + (n.date ? fmtDate(n.date) : '&mdash;') + '</div><div class="tx" style="flex:1;white-space:pre-wrap;">' + nl2br(n.text) + '</div>' +
+      '<button type="button" class="note-hide-btn" onclick="toggleNoteHidden(\'' + kind + '\',\'' + entity.id + '\',' + idx + ')">' + (n.hidden ? 'Unhide' : 'Hide') + '</button></div>';
+  }).join('');
+  return '<div style="margin-top:' + (marginTop || 14) + 'px;"><div class="detail-item k">' + (label || 'Project Notes') + '</div><div style="margin-top:4px;">' + rows + '</div>' +
+    (hiddenCount ? '<button type="button" class="link-btn" style="font-size:0.74rem;margin-top:4px;" onclick="toggleShowHiddenNotes(\'' + key + '\')">' + (showHidden ? 'Stop showing' : 'Show') + ' ' + hiddenCount + ' hidden note' + (hiddenCount === 1 ? '' : 's') + '</button>' : '') + '</div>';
+}
+function toggleShowHiddenNotes(key) { _showHiddenNotes[key] = !_showHiddenNotes[key]; rerenderProject(); }
+function toggleNoteHidden(kind, id, idx) {
+  var ent = kind === 'p' ? window.currentProjectData : (currentProjectItems || []).filter(function (i) { return i.id === id; })[0];
+  if (!ent) return;
+  var entries = projectNoteEntries(ent).map(function (n) { var o = { date: n.date || '', text: n.text }; if (n.hidden) o.hidden = true; return o; });
+  if (!entries[idx]) return;
+  if (entries[idx].hidden) delete entries[idx].hidden; else entries[idx].hidden = true;
+  var p = kind === 'p' ? updateProjectRow(id, { notes_log: entries }) : updateItemRow(id, { notes_log: entries });
+  p.then(function () { ent.notes_log = entries; rerenderProject(); }).catch(function (e) { toast('Save failed: ' + e.message, 'error'); });
 }
 function openProjectForm(project) {
   var isEdit = !!(project && project.id);
@@ -1557,6 +1615,9 @@ function onItemTaskDoneChange() {
 function onItemCategoryChange() {
   var sel = document.getElementById('if-category');
   var catName = sel.selectedOptions && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : '';
+  var isGlass = String(catName).trim().toLowerCase() === 'glass';
+  document.getElementById('if-glass-wrap').style.display = isGlass ? '' : 'none';
+  document.getElementById('if-glazing-wrap').style.display = isGlass ? '' : 'none';
   var show = SOREX_WINHAUS_CATEGORIES.indexOf(catName) !== -1;
   document.getElementById('if-sorex-wrap').style.display = show ? '' : 'none';
   document.getElementById('if-winhaus-wrap').style.display = show ? '' : 'none';
