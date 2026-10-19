@@ -355,7 +355,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
     <!-- Views are rendered here by JS -->
   </div>
 
-  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.30</div>
+  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.31</div>
 </div>
 
 <!-- ============================================
@@ -1528,7 +1528,7 @@ function renderDrawings() {
         '<button class="btn btn-secondary btn-sm" onclick="openDrawingsReport()">Report</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="exportDrawingsPDF()">PDF</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="exportDrawingsExcel()">Excel</button>' +
-        '<button class="btn btn-ghost btn-sm" onclick="importOldDrawings()" title="One-time copy from the old Drawing Tracker">Import from old tracker</button>' +
+        '<button class="btn btn-ghost btn-sm" onclick="importOldDrawings()" title="Bring in new drawings and refresh imported ones from the live old Drawing Tracker">Sync from old tracker</button>' +
       '</div></div>' +
     '<div class="dw-stats">' + stats + '</div>' +
     '<div id="dw-table">' + dwTableHtml() + '</div>'
@@ -1877,16 +1877,16 @@ function mapOldDrawing(o, plist) {
   };
 }
 function importOldDrawings() {
-  confirmDialog('Copy all drawings from the old Drawing Tracker into this system? Drawings that match an existing project (by number, then name) are linked to it; the rest create a new project. Already-imported drawings are skipped and the old tracker is not changed.', function () {
+  confirmDialog('Sync drawings from the LIVE old Drawing Tracker? New drawings are added (a project is created if none matches by number, then name). Drawings imported earlier are UPDATED with the latest tracker values, so any changes you made to them in this system will be overwritten. The old tracker is not changed.', function () {
     return Promise.all([oldGet('drawings'), listProjects(), listDrawings()]).then(function (r) {
       var old = r[0], plist = r[1], existing = {};
-      r[2].forEach(function (d) { if (d.legacy_id) existing[d.legacy_id] = 1; });
-      var fresh = old.filter(function (o) { return !existing[String(o.id)]; });
-      if (!fresh.length) { toast('Nothing new to import (' + old.length + ' already imported)', 'success'); return null; }
-      var rows = fresh.map(function (o) { return mapOldDrawing(o, plist); });
+      r[2].forEach(function (d) { if (d.legacy_id) existing[d.legacy_id] = d; });
+      var mapped = old.map(function (o) { return { o: o, row: mapOldDrawing(o, plist), had: existing[String(o.id)] || null }; });
+      var fresh = mapped.filter(function (m) { return !m.had; }).map(function (m) { return m.row; });
+      var toUpdate = mapped.filter(function (m) { return m.had; });
       // drawings with no matching project (e.g. not yet approved) get a new project, one per project no./name
       var groups = {}, order = [];
-      rows.forEach(function (row) {
+      fresh.forEach(function (row) {
         if (row.project_id) return;
         var key = String(row.legacy_project_no || '').trim().toLowerCase() || String(row.legacy_project_name || '').trim().toLowerCase();
         if (!key) return;
@@ -1909,22 +1909,33 @@ function importOldDrawings() {
           }).then(function (np) { created++; plist.push(np); g.forEach(function (x) { x.project_id = np.id; }); });
         });
       }, Promise.resolve());
-      return makeProjects.then(function () { return sb.from('drawings').insert(rows); }).then(function (ins) {
-        if (ins.error) throw ins.error;
-        // fill blank project details (never overwrite) from approved drawings
-        var jobs = [];
-        rows.forEach(function (row) {
-          if (!row.project_id || row.drawing_status !== 'Approved') return;
-          var p = plist.filter(function (x) { return x.id === row.project_id; })[0], up = {};
+      var updated = 0;
+      return makeProjects.then(function () {
+        var ins = fresh.length ? sb.from('drawings').insert(fresh) : Promise.resolve({ error: null });
+        return ins.then(function (res) {
+          if (res.error) throw res.error;
+          return Promise.all(toUpdate.map(function (m) {
+            var up = Object.assign({}, m.row, { updated_at: new Date().toISOString() });
+            if (m.had.project_id) up.project_id = m.had.project_id; // keep the existing project link
+            else if (!up.project_id) delete up.project_id;
+            return sb.from('drawings').update(up).eq('legacy_id', String(m.o.id)).then(function (u) { if (u.error) throw u.error; updated++; m.row = up; });
+          }));
+        });
+      }).then(function () {
+        // fill blank project details (never overwrite); approved drawings first
+        var all = fresh.concat(toUpdate.map(function (m) { return m.row; })).filter(function (x) { return x.project_id && x.drawing_status !== 'Cancelled'; });
+        all.sort(function (a, b) { return (b.drawing_status === 'Approved') - (a.drawing_status === 'Approved') || String(b.approval_date || '').localeCompare(String(a.approval_date || '')); });
+        var ups = {};
+        all.forEach(function (row) {
+          var p = plist.filter(function (x) { return x.id === row.project_id; })[0]; if (!p) return;
+          var up = ups[p.id] || (ups[p.id] = {});
           if (!p.approved_ral_color && row.legacy_frame_color) { up.approved_ral_color = row.legacy_frame_color; p.approved_ral_color = row.legacy_frame_color; }
           if (!p.approved_glass && row.legacy_glass_spec) { up.approved_glass = row.legacy_glass_spec; p.approved_glass = row.legacy_glass_spec; }
           if (!p.install_date && row.legacy_install_date) { up.install_date = row.legacy_install_date; p.install_date = row.legacy_install_date; }
-          if (Object.keys(up).length) jobs.push(updateProjectRow(p.id, up));
         });
-        return Promise.all(jobs).then(function () {
-          var linked = rows.filter(function (x) { return x.project_id; }).length;
-          toast('Imported ' + rows.length + ' drawing(s); ' + created + ' new project(s) created for drawings with no matching project', 'success');
-        });
+        return Promise.all(Object.keys(ups).filter(function (id) { return Object.keys(ups[id]).length; }).map(function (id) { return updateProjectRow(id, ups[id]); }));
+      }).then(function () {
+        toast('Synced: ' + fresh.length + ' added, ' + updated + ' updated, ' + created + ' new project(s) created', 'success');
       });
     }).then(function () { showDrawings(); });
   });
