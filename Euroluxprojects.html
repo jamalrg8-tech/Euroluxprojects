@@ -154,6 +154,15 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
 .quotes-list tbody tr.snap-late { background: #fef2f2; }
 .quotes-list tbody tr.snap-cols th { background: #e9e9e5; color: #333; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; padding: 0.4rem 0.9rem; white-space: nowrap; }
 .rpt-late { color: #b91c1c; font-weight: 700; }
+.dw-badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 0.68rem; font-weight: 700; color: #fff; white-space: nowrap; }
+.dw-stats { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 12px; }
+.dw-stat { border: 1px solid #ddd; background: #fff; border-radius: 16px; padding: 4px 12px; font-size: 0.76rem; cursor: pointer; }
+.dw-stat.on { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.dw-chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #bbb; border-radius: 14px; padding: 3px 10px; font-size: 0.74rem; cursor: pointer; margin: 2px; background: #fff; user-select: none; }
+.dw-chip.on { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.dw-shared { background: #f4f7fb; border: 1px solid #d5e1f0; border-radius: 6px; padding: 10px 12px; margin-top: 10px; }
+.dw-shared .hd { font-size: 0.72rem; font-weight: 700; color: #1f4e8c; margin-bottom: 6px; }
+.dw-unlinked { color: #b45309; font-weight: 700; font-size: 0.7rem; }
 .item-collapsed { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0.6rem 1rem !important; margin-bottom: 10px; background: #fafafa; }
 .item-collapsed .t { font-weight: 600; font-size: 0.85rem; }
 .note-hide-btn { border: none; background: none; color: #666; font-size: 0.72rem; cursor: pointer; text-decoration: underline; flex: none; margin-left: 8px; }
@@ -328,6 +337,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
     <button class="nav-btn" data-route="dashboard" onclick="showDashboard()">Dashboard</button>
     <button class="nav-btn" data-route="projects" onclick="showProjects()">Projects</button>
     <button class="nav-btn" data-route="snapshot" onclick="showSnapshot()">Snapshot Report</button>
+    <button class="nav-btn" data-route="drawings" onclick="showDrawings()">Drawings</button>
     <button class="nav-btn" data-route="deliveries" onclick="showDeliveries()">Deliveries</button>
     <button class="nav-btn" data-route="reports" onclick="showReports()">Reports</button>
     <button class="nav-btn" data-route="admin" onclick="showAdmin()">Reference Data</button>
@@ -340,7 +350,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
     <!-- Views are rendered here by JS -->
   </div>
 
-  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.20</div>
+  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.30</div>
 </div>
 
 <!-- ============================================
@@ -557,6 +567,59 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
 <!-- ============================================
      GENERIC DASHBOARD DRILL-DOWN LIST MODAL
      ============================================ -->
+<div class="modal-overlay" id="drawing-modal" onclick="if(event.target===this)closeDrawingForm()">
+  <div class="modal wide">
+    <div class="modal-header">
+      <h3 id="drawing-modal-ttl">Drawing</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeDrawingForm()">&#10005; Close</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid form-grid-2">
+        <div class="form-group"><label>Project *</label><select id="df-project" onchange="onDrawingProjectChange()"></select></div>
+        <div class="form-group"><label>Drawing Status</label>
+          <select id="df-status" onchange="onDrawingStatusChange()"><option>Yet to be prepared</option><option>Submitted</option><option>Approved</option><option>Cancelled</option></select></div>
+        <div class="form-group"><label>Revision No.</label><input type="text" id="df-rev" /></div>
+        <div class="form-group"><label>Designer</label><input type="text" id="df-designer" list="df-designer-list" /><datalist id="df-designer-list"><option>Farah</option><option>Fadil</option><option>Vanessa</option></datalist></div>
+        <div class="form-group"><label>Submission Date</label><input type="date" id="df-submitted" /></div>
+        <div class="form-group"><label>Approval Date</label><input type="date" id="df-approved" onchange="onDrawingApprovalDateChange()" /></div>
+      </div>
+      <div class="dw-shared">
+        <div class="hd">Project details &mdash; shared with the project (saved once, no double entry)</div>
+        <div class="form-grid form-grid-2">
+          <div class="form-group"><label>Project No.</label><input type="text" id="df-ref" disabled /></div>
+          <div class="form-group"><label>Client</label><input type="text" id="df-client" disabled /></div>
+          <div class="form-group"><label>RAL Colour</label><input type="text" id="df-ral" placeholder="e.g. RAL 9016M" /></div>
+          <div class="form-group"><label>Approved Glass</label><input type="text" id="df-glass" list="pf-glass-list" /></div>
+          <div class="form-group"><label>Installation Date</label><input type="date" id="df-install" /><div class="muted" id="df-install-hint" style="font-size:0.68rem;margin-top:3px;"></div></div>
+        </div>
+      </div>
+      <div class="form-grid form-grid-2" style="margin-top:12px;">
+        <div class="form-group"><label>Flyscreen Spec</label><input type="text" id="df-fly" /></div>
+        <div class="form-group"><label>Box Section</label><select id="df-box"><option value="">&mdash;</option><option>Yes</option><option>No</option></select></div>
+        <div class="form-group"><label>Flat Bars Required</label><select id="df-flat" onchange="document.getElementById('df-flat-details').style.display=this.value==='Yes'?'':'none'"><option value="">&mdash;</option><option>Yes</option><option>No</option></select></div>
+        <div class="form-group" id="df-flat-details" style="display:none;"><label>Flat Bar Width / Thickness</label><div style="display:flex;gap:6px;"><input type="text" id="df-flat-w" placeholder="Width" /><input type="text" id="df-flat-t" placeholder="Thickness" /></div></div>
+      </div>
+      <div class="form-group full" style="margin-top:12px;"><label>Frame Supplier(s) <span class="muted" style="text-transform:none;">(max 5)</span></label>
+        <div id="df-suppliers"></div>
+        <div style="display:flex;gap:6px;margin-top:4px;"><input type="text" id="df-supplier-custom" placeholder="Other supplier" style="max-width:200px;" /><button type="button" class="btn btn-ghost btn-sm" onclick="addCustomDrawingSupplier()">Add</button></div></div>
+      <div class="form-group full" style="margin-top:12px;"><label>Items List <span class="muted" style="text-transform:none;">(one per line, e.g. SCHUCO: 3 sliding doors)</span></label><textarea id="df-items" rows="3"></textarea></div>
+      <div class="form-grid form-grid-2" style="margin-top:12px;">
+        <div class="form-group"><label>Production Confirmed Date</label><input type="text" id="df-prod" placeholder="Date or note, e.g. BES - 05.12.2025" /></div>
+        <div class="form-group"><label>Delivery Request Date</label><input type="text" id="df-delreq" placeholder="Date or note" /></div>
+        <div class="form-group"><label>Action Required</label><input type="text" id="df-action" /></div>
+        <div class="form-group"><label>Action Due Date</label><input type="date" id="df-action-due" /></div>
+        <div class="form-group"><label>NAS Link</label><input type="text" id="df-nas" placeholder="Folder path or link" /></div>
+      </div>
+      <div class="form-group full" style="margin-top:12px;"><label>Remarks</label><textarea id="df-remarks" rows="3"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="df-delete" onclick="deleteDrawingFromForm()" style="margin-right:auto;">Delete</button>
+      <button class="btn btn-secondary" onclick="closeDrawingForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveDrawingForm()">Save Drawing</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="list-modal" onclick="if(event.target===this)closeListModal()">
   <div class="modal wide">
     <div class="modal-header">
@@ -624,6 +687,7 @@ function goBack() {
   else if (prev.name === 'projects') showProjects();
   else if (prev.name === 'projectDetail') showProjectDetail(prev.arg);
   else if (prev.name === 'snapshot') showSnapshot();
+  else if (prev.name === 'drawings') showDrawings();
   else if (prev.name === 'deliveries') showDeliveries();
   else if (prev.name === 'reports') showReports();
   else if (prev.name === 'admin') showAdmin();
@@ -1231,7 +1295,8 @@ function showProjectDetail(id) {
   currentProjectId = id;
   setActiveNav('projects');
   render('<div class="empty-state">Loading project&hellip;</div>');
-  Promise.all([getProject(id), listItems(id)]).then(function (results) {
+  Promise.all([getProject(id), listItems(id), listDrawings(id)]).then(function (results) {
+    window.currentProjectDrawings = results[2];
     renderProjectDetail(results[0], results[1]);
   }).catch(function (e) {
     render('<div class="empty-state"><h3>Project not found</h3><p>' + esc(e.message) + '</p></div>');
@@ -1360,6 +1425,7 @@ function renderProjectDetail(project, items) {
       (project.scope_text ? '<div style="margin-top:14px;"><div class="detail-item k">Project Scope</div><div style="margin-top:4px;white-space:pre-wrap;font-size:0.82rem;">' + nl2br(project.scope_text) + '</div></div>' : '') +
       notesLogHtml(project, 'Project Notes', 14, 'p') +
     '</div>' +
+    dwProjectSectionHtml() +
     '<div class="sec-title" style="font-weight:700;margin:1.2rem 0 0.6rem;display:flex;justify-content:space-between;align-items:center;">Procurement Items (' + items.length + ')' +
       (items.length ? '<span class="hide-links"><button class="link-btn" onclick="setAllItemsHidden(true)">Hide all</button><button class="link-btn" onclick="setAllItemsHidden(false)">Show all</button></span>' : '') + '</div>' +
     '<div id="project-tab-body">' + itemsTabHtml + '</div>' +
@@ -1367,6 +1433,491 @@ function renderProjectDetail(project, items) {
   );
   window.currentProjectData = project;
 }
+
+// ============================================
+// DRAWINGS MODULE (formerly the separate Drawing Tracker)
+// Shared details (client, project no., name, RAL, glass, install date) live on the project.
+// ============================================
+var DRAWING_STATUSES = ['Yet to be prepared', 'Submitted', 'Approved', 'Cancelled'];
+var DRAWING_COLORS = { 'Approved': '#4CAF50', 'Submitted': '#2196F3', 'Yet to be prepared': '#FF9800', 'Cancelled': '#9E9E9E' };
+var FRAME_SUPPLIER_OPTIONS = ['SCHUCO', 'VETROMAX', 'DECOMASTER', 'ORIGIN', 'FUSION', 'ATLAS', 'ALUMIL'];
+var MAX_FRAME_SUPPLIERS = 5;
+var INSTALL_WEEKS_AFTER_APPROVAL = 8;
+var OLD_TRACKER_URL = 'https://tyhybxxbhgyuswlizrmc.supabase.co';
+var OLD_TRACKER_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5aHlieHhiaGd5dXN3bGl6cm1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMDY0MzQsImV4cCI6MjA5NjU4MjQzNH0.2kz4T1qcreDeZXhs4AJDwx8Ur-Tpww6oRB5z3jDv4Es';
+var drawingsFilter = { search: '', status: '' };
+var _allDrawings = [];
+var _dwProjects = [];
+var editingDrawingId = null;
+var dwSelectedSuppliers = [];
+window.currentProjectDrawings = [];
+
+function dwLabel(st) { return st === 'Yet to be prepared' ? 'Pending' : st; }
+function dwBadge(st) { return '<span class="dw-badge" style="background:' + (DRAWING_COLORS[st] || '#999') + ';">' + esc(dwLabel(st)) + '</span>'; }
+function listDrawings(projectId) {
+  var q = sb.from('drawings').select('*');
+  if (projectId) q = q.eq('project_id', projectId);
+  return q.order('created_at').then(function (r) {
+    if (r.error) { if (!projectId) throw r.error; return []; } // project page still works before the migration is run
+    return r.data || [];
+  });
+}
+function dwProject(d) { return _dwProjects.filter(function (p) { return p.id === d.project_id; })[0] || (window.currentProjectData && window.currentProjectData.id === d.project_id ? window.currentProjectData : null); }
+function dwInfo(d) {
+  var p = dwProject(d);
+  return {
+    p: p, linked: !!p,
+    no: p ? (p.ref || '') : (d.legacy_project_no || ''),
+    name: p ? p.site_name : (d.legacy_project_name || ''),
+    client: p ? (p.client || '') : (d.legacy_client || ''),
+    ral: p ? (p.approved_ral_color || '') : (d.legacy_frame_color || ''),
+    glass: p ? (p.approved_glass || '') : (d.legacy_glass_spec || ''),
+    install: p ? (p.install_date || '') : (d.legacy_install_date || '')
+  };
+}
+function dwAddWeeks(iso, weeks) {
+  var dt = new Date(iso + 'T00:00:00'); dt.setDate(dt.getDate() + weeks * 7);
+  return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+}
+
+// ---- list screen ----
+function showDrawings() {
+  recordNav('drawings');
+  setActiveNav('drawings');
+  render('<div class="empty-state">Loading drawings&hellip;</div>');
+  Promise.all([listDrawings(), listProjects()]).then(function (r) {
+    _allDrawings = r[0]; _dwProjects = r[1];
+    renderDrawings();
+  }).catch(function (e) {
+    render('<div class="empty-state"><h3>Drawings could not be loaded</h3><p>' + esc(e.message) + '</p><p class="muted">Has the drawings migration (migration_add_drawings_module.sql) been run in Supabase?</p></div>');
+  });
+}
+function dwFiltered() {
+  var q = drawingsFilter.search.trim().toLowerCase();
+  return _allDrawings.filter(function (d) {
+    if (drawingsFilter.status && d.drawing_status !== drawingsFilter.status) return false;
+    if (!q) return true;
+    var n = dwInfo(d);
+    return [n.no, n.name, n.client, d.designer, d.frame_suppliers, n.ral].join(' ').toLowerCase().indexOf(q) !== -1;
+  });
+}
+function renderDrawings() {
+  var counts = {}; DRAWING_STATUSES.forEach(function (s) { counts[s] = 0; });
+  _allDrawings.forEach(function (d) { counts[d.drawing_status] = (counts[d.drawing_status] || 0) + 1; });
+  var unlinked = _allDrawings.filter(function (d) { return !d.project_id; }).length;
+  var stats = '<span class="dw-stat' + (!drawingsFilter.status ? ' on' : '') + '" onclick="setDrawingStatus(\'\')">All (' + _allDrawings.length + ')</span>' +
+    DRAWING_STATUSES.map(function (s) { return '<span class="dw-stat' + (drawingsFilter.status === s ? ' on' : '') + '" onclick="setDrawingStatus(\'' + s + '\')">' + dwLabel(s) + ' (' + counts[s] + ')</span>'; }).join('') +
+    (unlinked ? '<span class="dw-unlinked" style="align-self:center;">&#9888; ' + unlinked + ' not linked to a project</span>' : '');
+  render(
+    '<div class="dashboard-header"><div>' + backButtonHtml() + '<h1>Drawings</h1><p>Drawing approvals for every project &mdash; client, RAL colour, glass and install date come from the project.</p></div>' +
+      '<div class="search-wrap">' +
+        '<input type="text" id="dw-search" placeholder="Search project, client, designer&hellip;" value="' + esc(drawingsFilter.search) + '" oninput="setDrawingSearch(this.value)" />' +
+        '<button class="btn btn-primary btn-sm" onclick="openDrawingForm(null)">+ Add Drawing</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="openDrawingsReport()">Report</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="exportDrawingsPDF()">PDF</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="exportDrawingsExcel()">Excel</button>' +
+        '<button class="btn btn-ghost btn-sm" onclick="importOldDrawings()" title="One-time copy from the old Drawing Tracker">Import from old tracker</button>' +
+      '</div></div>' +
+    '<div class="dw-stats">' + stats + '</div>' +
+    '<div id="dw-table">' + dwTableHtml() + '</div>'
+  );
+}
+function setDrawingStatus(s) { drawingsFilter.status = s; renderDrawings(); }
+function setDrawingSearch(v) {
+  drawingsFilter.search = v;
+  document.getElementById('dw-table').innerHTML = dwTableHtml();
+}
+function dwTableHtml() {
+  var rows = dwFiltered();
+  if (!rows.length) return '<div class="empty-state"><div class="icon">&#128208;</div>No drawings match.</div>';
+  return '<div class="quotes-list-wrap"><table class="quotes-list"><thead><tr><th>Project No</th><th>Project</th><th>Client</th><th>Designer</th><th>Status</th><th>Rev</th><th>Submitted</th><th>Approved</th><th>Frame Supplier</th><th>RAL Colour</th><th></th></tr></thead><tbody>' +
+    rows.map(function (d) {
+      var n = dwInfo(d);
+      return '<tr onclick="viewDrawing(\'' + d.id + '\')">' +
+        '<td class="muted">' + (esc(n.no) || '&mdash;') + '</td>' +
+        '<td><b>' + esc(n.name) + '</b>' + (n.linked ? '' : '<div class="dw-unlinked">&#9888; not linked to a project</div>') + '</td>' +
+        '<td>' + (esc(n.client) || '&mdash;') + '</td>' +
+        '<td>' + (esc(d.designer) || '&mdash;') + '</td>' +
+        '<td>' + dwBadge(d.drawing_status) + '</td>' +
+        '<td class="muted">' + (esc(d.rev_no) || '&mdash;') + '</td>' +
+        '<td class="muted">' + fmtDate(d.submission_date) + '</td>' +
+        '<td class="muted">' + fmtDate(d.approval_date) + '</td>' +
+        '<td class="muted">' + (esc(d.frame_suppliers) || '&mdash;') + '</td>' +
+        '<td class="muted">' + (esc(n.ral) || '&mdash;') + '</td>' +
+        '<td style="white-space:nowrap;" onclick="event.stopPropagation()"><button class="btn btn-ghost btn-sm" onclick="openDrawingForm(\'' + d.id + '\')">' + (n.linked ? 'Edit' : 'Link') + '</button></td>' +
+      '</tr>';
+    }).join('') + '</tbody></table></div>';
+}
+
+// ---- view ----
+function dwKv(k, v) { return '<div class="detail-item"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>'; }
+function dwFind(id) {
+  return _allDrawings.filter(function (d) { return d.id === id; })[0] || (window.currentProjectDrawings || []).filter(function (d) { return d.id === id; })[0] || null;
+}
+function viewDrawing(id) {
+  var d = dwFind(id); if (!d) return;
+  var n = dwInfo(d);
+  var html =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' + dwBadge(d.drawing_status) +
+      '<span><button class="btn btn-secondary btn-sm" onclick="closeListModal();openDrawingForm(\'' + d.id + '\')">Edit</button>' +
+      (n.linked ? ' <button class="btn btn-ghost btn-sm" onclick="closeListModal();showProjectDetail(\'' + n.p.id + '\')">Open project</button>' : '') + '</span></div>' +
+    '<div class="sec-title" style="font-weight:700;margin:6px 0;">Drawing &amp; Approval</div><div class="detail-grid">' +
+      dwKv('Project No', esc(n.no) || '&mdash;') + dwKv('Project', esc(n.name)) + dwKv('Client', esc(n.client) || '&mdash;') +
+      dwKv('Designer', esc(d.designer) || '&mdash;') + dwKv('Revision', esc(d.rev_no) || '&mdash;') +
+      dwKv('Submitted', fmtDate(d.submission_date)) + dwKv('Approved', fmtDate(d.approval_date)) + dwKv('Installation Date', fmtDate(n.install)) + '</div>' +
+    '<div class="sec-title" style="font-weight:700;margin:14px 0 6px;">Frame &amp; Glass Specifications</div><div class="detail-grid">' +
+      dwKv('RAL Colour', esc(n.ral) || '&mdash;') + dwKv('Approved Glass', esc(n.glass) || '&mdash;') + dwKv('Flyscreen', esc(d.flyscreen_spec) || '&mdash;') +
+      dwKv('Box Section', esc(d.box_section) || '&mdash;') +
+      dwKv('Flat Bars', d.flat_bars_required === 'Yes' ? 'Yes (' + esc(d.flat_bar_width || '-') + ' x ' + esc(d.flat_bar_thickness || '-') + ')' : (esc(d.flat_bars_required) || '&mdash;')) + '</div>' +
+    '<div class="sec-title" style="font-weight:700;margin:14px 0 6px;">Production &amp; Delivery</div><div class="detail-grid">' +
+      dwKv('Frame Supplier(s)', esc(d.frame_suppliers) || '&mdash;') + dwKv('Production Confirmed', esc(d.production_confirmed_date) || '&mdash;') + dwKv('Delivery Requested', esc(d.delivery_request_date) || '&mdash;') + '</div>' +
+    (d.items_list ? '<div style="margin-top:8px;"><div class="detail-item k">Items</div><div style="white-space:pre-wrap;font-size:0.82rem;margin-top:3px;">' + esc(d.items_list) + '</div></div>' : '') +
+    '<div class="sec-title" style="font-weight:700;margin:14px 0 6px;">Remarks &amp; Actions</div><div class="detail-grid">' +
+      dwKv('Action Required', esc(d.action_required) || '&mdash;') + dwKv('Action Due', fmtDate(d.action_due_date)) + '</div>' +
+    (d.remarks ? '<div style="white-space:pre-wrap;font-size:0.82rem;margin-top:6px;">' + esc(d.remarks) + '</div>' : '') +
+    (d.nas_link ? '<div style="margin-top:10px;"><div class="detail-item k">NAS Link</div><div style="font-size:0.82rem;word-break:break-all;">' + (/^https?:/i.test(d.nas_link) ? '<a href="' + esc(d.nas_link) + '" target="_blank" rel="noopener">' + esc(d.nas_link) + '</a>' : esc(d.nas_link)) + '</div></div>' : '');
+  openListModal('Drawing — ' + (n.name || ''), html);
+}
+
+// ---- form ----
+function closeDrawingForm() { document.getElementById('drawing-modal').classList.remove('open'); }
+function dwProjectList() { return (_dwProjects && _dwProjects.length ? _dwProjects : (_allProjectsCache || [])); }
+function dwRenderSuppliers() {
+  var all = FRAME_SUPPLIER_OPTIONS.concat(dwSelectedSuppliers.filter(function (x) { return FRAME_SUPPLIER_OPTIONS.indexOf(x) === -1; }));
+  document.getElementById('df-suppliers').innerHTML = all.map(function (x) {
+    return '<span class="dw-chip' + (dwSelectedSuppliers.indexOf(x) !== -1 ? ' on' : '') + '" onclick="toggleDrawingSupplier(this.getAttribute(\'data-s\'))" data-s="' + esc(x) + '">' + esc(x) + '</span>';
+  }).join('');
+}
+function toggleDrawingSupplier(name) {
+  var i = dwSelectedSuppliers.indexOf(name);
+  if (i !== -1) dwSelectedSuppliers.splice(i, 1);
+  else if (dwSelectedSuppliers.length >= MAX_FRAME_SUPPLIERS) { toast('Maximum ' + MAX_FRAME_SUPPLIERS + ' frame suppliers', 'error'); return; }
+  else dwSelectedSuppliers.push(name);
+  dwRenderSuppliers();
+}
+function addCustomDrawingSupplier() {
+  var inp = document.getElementById('df-supplier-custom'), v = inp.value.trim().toUpperCase();
+  if (!v) return;
+  inp.value = '';
+  if (dwSelectedSuppliers.indexOf(v) === -1) toggleDrawingSupplier(v);
+}
+function openDrawingForm(id, projectId) {
+  var d = id ? dwFind(id) : null;
+  editingDrawingId = d ? d.id : null;
+  var plist = dwProjectList();
+  document.getElementById('drawing-modal-ttl').textContent = d ? 'Edit Drawing' : 'Add Drawing';
+  var selId = d ? d.project_id : (projectId || '');
+  var legacyHint = '';
+  if (d && !d.project_id) {
+    // try to pre-select a likely match for an unlinked drawing
+    var m = dwMatchProject(d.legacy_project_no, d.legacy_project_name, plist);
+    if (m) selId = m.id;
+    legacyHint = ' - from old tracker: ' + (d.legacy_project_no || '') + ' ' + (d.legacy_project_name || '');
+  }
+  document.getElementById('df-project').innerHTML = '<option value="">&mdash; choose project' + esc(legacyHint) + ' &mdash;</option>' +
+    plist.map(function (p) { return '<option value="' + p.id + '"' + (p.id === selId ? ' selected' : '') + '>' + esc((p.ref ? p.ref + ' - ' : '') + p.site_name) + '</option>'; }).join('');
+  document.getElementById('df-status').value = d ? d.drawing_status : 'Yet to be prepared';
+  document.getElementById('df-rev').value = d ? (d.rev_no || '') : '';
+  document.getElementById('df-designer').value = d ? (d.designer || '') : '';
+  document.getElementById('df-submitted').value = d ? (d.submission_date || '') : '';
+  document.getElementById('df-approved').value = d ? (d.approval_date || '') : '';
+  document.getElementById('df-fly').value = d ? (d.flyscreen_spec || '') : '';
+  document.getElementById('df-box').value = d ? (d.box_section || '') : '';
+  document.getElementById('df-flat').value = d ? (d.flat_bars_required || '') : '';
+  document.getElementById('df-flat-details').style.display = (d && d.flat_bars_required === 'Yes') ? '' : 'none';
+  document.getElementById('df-flat-w').value = d ? (d.flat_bar_width || '') : '';
+  document.getElementById('df-flat-t').value = d ? (d.flat_bar_thickness || '') : '';
+  dwSelectedSuppliers = d && d.frame_suppliers ? d.frame_suppliers.split(/\s*&\s*/).filter(Boolean) : [];
+  dwRenderSuppliers();
+  document.getElementById('df-items').value = d ? (d.items_list || '') : '';
+  document.getElementById('df-prod').value = d ? (d.production_confirmed_date || '') : '';
+  document.getElementById('df-delreq').value = d ? (d.delivery_request_date || '') : '';
+  document.getElementById('df-action').value = d ? (d.action_required || '') : '';
+  document.getElementById('df-action-due').value = d ? (d.action_due_date || '') : '';
+  document.getElementById('df-nas').value = d ? (d.nas_link || '') : '';
+  document.getElementById('df-remarks').value = d ? (d.remarks || '') : '';
+  document.getElementById('df-delete').style.display = d ? '' : 'none';
+  window._dwEditing = d;
+  onDrawingProjectChange(true);
+  document.getElementById('drawing-modal').classList.add('open');
+}
+function onDrawingProjectChange(initial) {
+  var pid = document.getElementById('df-project').value;
+  var p = dwProjectList().filter(function (x) { return x.id === pid; })[0];
+  var d = window._dwEditing;
+  document.getElementById('df-ref').value = p ? (p.ref || '') : (d ? (d.legacy_project_no || '') : '');
+  document.getElementById('df-client').value = p ? (p.client || '') : (d ? (d.legacy_client || '') : '');
+  // shared details: take the project's values; for an unlinked legacy drawing fall back to the old tracker's values
+  document.getElementById('df-ral').value = p ? (p.approved_ral_color || (d && !d.project_id ? d.legacy_frame_color || '' : '')) : (d ? (d.legacy_frame_color || '') : '');
+  document.getElementById('df-glass').value = p ? (p.approved_glass || (d && !d.project_id ? d.legacy_glass_spec || '' : '')) : (d ? (d.legacy_glass_spec || '') : '');
+  document.getElementById('df-install').value = p ? (p.install_date || (d && !d.project_id ? d.legacy_install_date || '' : '')) : (d ? (d.legacy_install_date || '') : '');
+  dwInstallHint();
+}
+function dwInstallHint() {
+  var a = document.getElementById('df-approved').value, cur = document.getElementById('df-install').value;
+  var h = document.getElementById('df-install-hint');
+  if (!a) { h.innerHTML = ''; return; }
+  var sug = dwAddWeeks(a, INSTALL_WEEKS_AFTER_APPROVAL);
+  h.innerHTML = cur === sug ? '' : 'Suggested: ' + fmtDatePlain(sug) + ' (approval + ' + INSTALL_WEEKS_AFTER_APPROVAL + ' weeks) <button type="button" class="link-btn" onclick="document.getElementById(\'df-install\').value=\'' + sug + '\';dwInstallHint()">Use</button>';
+}
+function onDrawingApprovalDateChange() {
+  var a = document.getElementById('df-approved').value;
+  if (a && !document.getElementById('df-install').value) document.getElementById('df-install').value = dwAddWeeks(a, INSTALL_WEEKS_AFTER_APPROVAL);
+  if (a && document.getElementById('df-status').value !== 'Approved' && document.getElementById('df-status').value !== 'Cancelled') document.getElementById('df-status').value = 'Approved';
+  dwInstallHint();
+}
+function onDrawingStatusChange() {
+  if (document.getElementById('df-status').value === 'Approved' && !document.getElementById('df-approved').value) {
+    document.getElementById('df-approved').value = todayISO();
+    onDrawingApprovalDateChange();
+  }
+}
+function dwMatchProject(no, name, plist) {
+  no = String(no || '').trim().toLowerCase(); name = String(name || '').trim().toLowerCase();
+  var byNo = no ? plist.filter(function (p) { return String(p.ref || '').trim().toLowerCase() === no; }) : [];
+  if (byNo.length === 1) return byNo[0];
+  var byName = name ? plist.filter(function (p) { return String(p.site_name || '').trim().toLowerCase() === name; }) : [];
+  if (byName.length === 1) return byName[0];
+  return null;
+}
+function saveDrawingForm() {
+  var pid = document.getElementById('df-project').value;
+  if (!pid) { toast('Choose the project for this drawing', 'error'); return; }
+  var g = function (id) { return document.getElementById(id).value; };
+  var payload = {
+    project_id: pid,
+    drawing_status: g('df-status'),
+    rev_no: g('df-rev').trim() || null,
+    designer: g('df-designer').trim() || null,
+    submission_date: g('df-submitted') || null,
+    approval_date: g('df-approved') || null,
+    flyscreen_spec: g('df-fly').trim() || null,
+    box_section: g('df-box') || null,
+    flat_bars_required: g('df-flat') || null,
+    flat_bar_width: g('df-flat') === 'Yes' ? (g('df-flat-w').trim() || null) : null,
+    flat_bar_thickness: g('df-flat') === 'Yes' ? (g('df-flat-t').trim() || null) : null,
+    frame_suppliers: dwSelectedSuppliers.join(' & ') || null,
+    items_list: g('df-items').trim() || null,
+    production_confirmed_date: g('df-prod').trim() || null,
+    delivery_request_date: g('df-delreq').trim() || null,
+    action_required: g('df-action').trim() || null,
+    action_due_date: g('df-action-due') || null,
+    nas_link: g('df-nas').trim() || null,
+    remarks: g('df-remarks').trim() || null,
+    updated_at: new Date().toISOString()
+  };
+  if (payload.drawing_status === 'Approved' && !payload.approval_date) { toast('Enter the approval date', 'error'); return; }
+  var proj = dwProjectList().filter(function (x) { return x.id === pid; })[0];
+  // shared details go to the project (single source of truth) when they changed
+  var shared = {};
+  var ral = g('df-ral').trim() || null, glass = g('df-glass').trim() || null, inst = g('df-install') || null;
+  if (proj) {
+    if (ral && ral !== (proj.approved_ral_color || null)) shared.approved_ral_color = ral;
+    if (glass && glass !== (proj.approved_glass || null)) shared.approved_glass = glass;
+    if (inst && inst !== (proj.install_date || null)) shared.install_date = inst;
+    if (payload.approval_date && !proj.design_signoff_date && payload.drawing_status === 'Approved') shared.design_signoff_date = payload.approval_date;
+  }
+  var changedProject = Object.keys(shared).length > 0;
+  var q = editingDrawingId ? sb.from('drawings').update(payload).eq('id', editingDrawingId) : sb.from('drawings').insert(payload);
+  q.then(function (r) {
+    if (r.error) throw r.error;
+    return changedProject ? updateProjectRow(pid, shared) : null;
+  }).then(function () {
+    toast('Drawing saved' + (changedProject ? ' — project details updated' : ''), 'success');
+    closeDrawingForm();
+    if (window.currentRoute === 'projectDetail' || (navStack.length && navStack[navStack.length - 1].name === 'projectDetail')) showProjectDetail(currentProjectId);
+    else showDrawings();
+  }).catch(function (e) { toast('Save failed: ' + e.message, 'error'); });
+}
+function deleteDrawingFromForm() {
+  if (!editingDrawingId) return;
+  var id = editingDrawingId;
+  closeDrawingForm();
+  confirmDialog('Delete this drawing? This cannot be undone.', function () {
+    return sb.from('drawings').delete().eq('id', id).then(function (r) {
+      if (r.error) throw r.error;
+      toast('Drawing deleted', 'success');
+      if (navStack.length && navStack[navStack.length - 1].name === 'projectDetail') showProjectDetail(currentProjectId); else showDrawings();
+    });
+  });
+}
+
+// ---- project detail section ----
+function dwProjectSectionHtml() {
+  var ds = window.currentProjectDrawings || [];
+  var pid = window.currentProjectData ? window.currentProjectData.id : currentProjectId;
+  var rows = ds.length ? '<div class="quotes-list-wrap"><table class="quotes-list"><thead><tr><th>Rev</th><th>Status</th><th>Designer</th><th>Submitted</th><th>Approved</th><th>Frame Supplier</th><th>Action Required</th><th></th></tr></thead><tbody>' +
+    ds.map(function (d) {
+      return '<tr onclick="viewDrawing(\'' + d.id + '\')"><td>' + (esc(d.rev_no) || '&mdash;') + '</td><td>' + dwBadge(d.drawing_status) + '</td><td>' + (esc(d.designer) || '&mdash;') + '</td>' +
+        '<td class="muted">' + fmtDate(d.submission_date) + '</td><td class="muted">' + fmtDate(d.approval_date) + '</td><td class="muted">' + (esc(d.frame_suppliers) || '&mdash;') + '</td>' +
+        '<td class="muted">' + (esc(d.action_required) || '&mdash;') + '</td>' +
+        '<td onclick="event.stopPropagation()"><button class="btn btn-ghost btn-sm" onclick="openDrawingForm(\'' + d.id + '\')">Edit</button></td></tr>';
+    }).join('') + '</tbody></table></div>' : '<div class="muted" style="font-size:0.8rem;padding:6px 2px;">No drawings recorded for this project yet.</div>';
+  return '<div class="sec-title" style="font-weight:700;margin:1.2rem 0 0.6rem;display:flex;justify-content:space-between;align-items:center;">Drawings (' + ds.length + ')' +
+    '<button class="btn btn-secondary btn-sm" onclick="openDrawingForm(null,\'' + pid + '\')">+ Add Drawing</button></div>' + rows;
+}
+
+// ---- reports ----
+function dwReportRows() {
+  return dwFiltered().map(function (d) {
+    var n = dwInfo(d);
+    return { d: d, n: n };
+  });
+}
+function openDrawingsReport() {
+  var rows = dwReportRows(), html = '';
+  ['Approved', 'Submitted', 'Yet to be prepared', 'Cancelled'].forEach(function (st) {
+    var g = rows.filter(function (r) { return r.d.drawing_status === st; });
+    if (!g.length) return;
+    html += '<div class="sec-title" style="font-weight:700;margin:14px 0 6px;">' + dwBadge(st) + ' <span class="muted" style="font-size:0.76rem;">' + g.length + ' drawing(s)</span></div>' +
+      '<div class="quotes-list-wrap"><table class="quotes-list static"><thead><tr><th>No</th><th>Project</th><th>Client</th><th>Rev</th><th>Submitted</th><th>Approved</th><th>Install</th><th>RAL</th><th>Frame Supplier</th></tr></thead><tbody>' +
+      g.map(function (r) {
+        return '<tr><td class="muted">' + (esc(r.n.no) || '&mdash;') + '</td><td><b>' + esc(r.n.name) + '</b></td><td>' + (esc(r.n.client) || '&mdash;') + '</td><td>' + (esc(r.d.rev_no) || '&mdash;') + '</td>' +
+          '<td class="muted">' + fmtDate(r.d.submission_date) + '</td><td class="muted">' + fmtDate(r.d.approval_date) + '</td><td class="muted">' + fmtDate(r.n.install) + '</td><td class="muted">' + (esc(r.n.ral) || '&mdash;') + '</td><td class="muted">' + (esc(r.d.frame_suppliers) || '&mdash;') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  });
+  openListModal('Drawings Report — ' + rows.length + ' drawing(s)', html || '<div class="empty-state">No drawings match.</div>');
+}
+function dwExportRows() {
+  return dwReportRows().map(function (r) {
+    return { ProjectNo: r.n.no, Project: r.n.name, Client: r.n.client, Designer: r.d.designer || '', Status: dwLabel(r.d.drawing_status), Rev: r.d.rev_no || '',
+      Submitted: fmtDatePlain(r.d.submission_date), Approved: fmtDatePlain(r.d.approval_date), InstallDate: fmtDatePlain(r.n.install), RALColour: r.n.ral, ApprovedGlass: r.n.glass,
+      Flyscreen: r.d.flyscreen_spec || '', BoxSection: r.d.box_section || '', FlatBars: r.d.flat_bars_required || '', FrameSuppliers: r.d.frame_suppliers || '', Items: r.d.items_list || '',
+      ProductionConfirmed: r.d.production_confirmed_date || '', DeliveryRequested: r.d.delivery_request_date || '', ActionRequired: r.d.action_required || '', ActionDue: fmtDatePlain(r.d.action_due_date), NAS: r.d.nas_link || '', Remarks: r.d.remarks || '' };
+  });
+}
+function exportDrawingsExcel() {
+  var rows = dwExportRows();
+  if (!rows.length) { toast('Nothing to export', 'error'); return; }
+  if (typeof XLSX === 'undefined') { downloadCSV('drawings.csv', rows); return; }
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Drawings');
+  XLSX.writeFile(wb, 'eurolux-drawings.xlsx');
+}
+function exportDrawingsPDF() {
+  var rows = dwReportRows();
+  if (!rows.length) { toast('Nothing to export', 'error'); return; }
+  var pdfReady = typeof window.jspdf !== 'undefined' && typeof window.jspdf.jsPDF === 'function';
+  var autoTableReady = pdfReady && typeof (new window.jspdf.jsPDF()).autoTable === 'function';
+  if (!pdfReady || !autoTableReady) { toast('PDF export library failed to load — check your connection and try again', 'error'); return; }
+  try {
+    var doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    doc.setFontSize(14); doc.text('Eurolux Drawings Report', 28, 30);
+    doc.setFontSize(8.5); doc.text('Generated ' + fmtDatePlain(todayISO()) + '  ·  ' + rows.length + ' drawing(s)', 28, 44);
+    var y = 58;
+    ['Approved', 'Submitted', 'Yet to be prepared', 'Cancelled'].forEach(function (st) {
+      var g = rows.filter(function (r) { return r.d.drawing_status === st; });
+      if (!g.length) return;
+      doc.autoTable({
+        startY: y,
+        head: [[{ content: dwLabel(st) + ' (' + g.length + ')', colSpan: 9, styles: { fillColor: [26, 26, 26], textColor: 255 } }],
+               ['No', 'Project', 'Client', 'Rev', 'Submitted', 'Approved', 'Install', 'RAL', 'Frame Supplier']],
+        body: g.map(function (r) { return [r.n.no, r.n.name, r.n.client, r.d.rev_no || '', fmtDatePlain(r.d.submission_date), fmtDatePlain(r.d.approval_date), fmtDatePlain(r.n.install), r.n.ral, r.d.frame_suppliers || '']; }),
+        styles: { fontSize: 7.5, cellPadding: 3.5, overflow: 'linebreak' },
+        margin: { left: 28, right: 28 }
+      });
+      y = doc.lastAutoTable.finalY + 14;
+    });
+    doc.save('eurolux-drawings-report.pdf');
+  } catch (e) { toast('PDF export failed: ' + e.message, 'error'); }
+}
+
+// ---- one-time import from the old Drawing Tracker ----
+function oldGet(table) {
+  return fetch(OLD_TRACKER_URL + '/rest/v1/' + table + '?select=*', { headers: { apikey: OLD_TRACKER_KEY, Authorization: 'Bearer ' + OLD_TRACKER_KEY } }).then(function (r) {
+    if (!r.ok) return r.text().then(function (t) { throw new Error(r.status + ': ' + t); });
+    return r.json();
+  });
+}
+function dwOld(o, a, b) { var v = o[a] != null ? o[a] : o[b]; return v === '' || v == null ? null : v; }
+function dwOldDate(v) { return v && /^\d{4}-\d{2}-\d{2}/.test(String(v)) ? String(v).slice(0, 10) : null; }
+function mapOldDrawing(o, plist) {
+  var no = dwOld(o, 'projectNo', 'projectno'), name = dwOld(o, 'projectName', 'projectname');
+  var m = dwMatchProject(no, name, plist);
+  var st = dwOld(o, 'drawingStatus', 'drawingstatus');
+  if (DRAWING_STATUSES.indexOf(st) === -1) st = st === 'Pending' ? 'Yet to be prepared' : 'Yet to be prepared';
+  var box = dwOld(o, 'boxSection', 'boxsection'), flat = dwOld(o, 'flatBarsRequired', 'flatbarsrequired');
+  return {
+    project_id: m ? m.id : null,
+    drawing_status: st,
+    rev_no: dwOld(o, 'revNo', 'revno'),
+    designer: dwOld(o, 'designer', 'designer'),
+    submission_date: dwOldDate(dwOld(o, 'submissionDate', 'submissiondate')),
+    approval_date: dwOldDate(dwOld(o, 'approvalDate', 'approvaldate')),
+    flyscreen_spec: dwOld(o, 'flyscreenSpec', 'flyscreenspec'),
+    box_section: box === 'Yes' || box === 'No' ? box : null,
+    flat_bars_required: flat === 'Yes' || flat === 'No' ? flat : null,
+    flat_bar_width: dwOld(o, 'flatBarWidth', 'flatbarwidth'),
+    flat_bar_thickness: dwOld(o, 'flatBarThickness', 'flatbarthickness'),
+    frame_suppliers: dwOld(o, 'frameSupplier', 'framesupplier'),
+    items_list: dwOld(o, 'itemsList', 'itemslist'),
+    production_confirmed_date: dwOld(o, 'productionConfirmedDate', 'productionconfirmeddate'),
+    delivery_request_date: dwOld(o, 'deliveryRequestDate', 'deliveryrequestdate'),
+    remarks: (function () { var r = dwOld(o, 'remarks', 'remarks'), ins = dwOld(o, 'installationDate', 'installationdate'); return [r, ins && !dwOldDate(ins) ? 'Install: ' + ins : null].filter(Boolean).join('\n') || null; })(),
+    action_required: dwOld(o, 'comments', 'comments'),
+    action_due_date: dwOldDate(dwOld(o, 'actionDueDate', 'actionduedate')),
+    nas_link: dwOld(o, 'nasLink', 'naslink'),
+    legacy_id: String(o.id),
+    legacy_project_no: no, legacy_project_name: name, legacy_client: dwOld(o, 'client', 'client'),
+    legacy_frame_color: dwOld(o, 'frameColor', 'framecolor'),
+    legacy_glass_spec: dwOld(o, 'glassSpec', 'glassspec'),
+    legacy_install_date: dwOldDate(dwOld(o, 'installationDate', 'installationdate'))
+  };
+}
+function importOldDrawings() {
+  confirmDialog('Copy all drawings from the old Drawing Tracker into this system? Drawings that match an existing project (by number, then name) are linked to it; the rest create a new project. Already-imported drawings are skipped and the old tracker is not changed.', function () {
+    return Promise.all([oldGet('drawings'), listProjects(), listDrawings()]).then(function (r) {
+      var old = r[0], plist = r[1], existing = {};
+      r[2].forEach(function (d) { if (d.legacy_id) existing[d.legacy_id] = 1; });
+      var fresh = old.filter(function (o) { return !existing[String(o.id)]; });
+      if (!fresh.length) { toast('Nothing new to import (' + old.length + ' already imported)', 'success'); return null; }
+      var rows = fresh.map(function (o) { return mapOldDrawing(o, plist); });
+      // drawings with no matching project (e.g. not yet approved) get a new project, one per project no./name
+      var groups = {}, order = [];
+      rows.forEach(function (row) {
+        if (row.project_id) return;
+        var key = String(row.legacy_project_no || '').trim().toLowerCase() || String(row.legacy_project_name || '').trim().toLowerCase();
+        if (!key) return;
+        if (!groups[key]) { groups[key] = []; order.push(key); }
+        groups[key].push(row);
+      });
+      var created = 0;
+      var makeProjects = order.reduce(function (chain, key) {
+        return chain.then(function () {
+          var g = groups[key], first = g[0];
+          var withInfo = function (f) { var h = g.filter(function (x) { return x[f]; })[0]; return h ? h[f] : null; };
+          return createProject({
+            site_name: first.legacy_project_name || first.legacy_project_no,
+            ref: first.legacy_project_no || null,
+            client: withInfo('legacy_client'),
+            approved_ral_color: withInfo('legacy_frame_color'),
+            approved_glass: withInfo('legacy_glass_spec'),
+            install_date: withInfo('legacy_install_date'),
+            status: 'Not Started'
+          }).then(function (np) { created++; plist.push(np); g.forEach(function (x) { x.project_id = np.id; }); });
+        });
+      }, Promise.resolve());
+      return makeProjects.then(function () { return sb.from('drawings').insert(rows); }).then(function (ins) {
+        if (ins.error) throw ins.error;
+        // fill blank project details (never overwrite) from approved drawings
+        var jobs = [];
+        rows.forEach(function (row) {
+          if (!row.project_id || row.drawing_status !== 'Approved') return;
+          var p = plist.filter(function (x) { return x.id === row.project_id; })[0], up = {};
+          if (!p.approved_ral_color && row.legacy_frame_color) { up.approved_ral_color = row.legacy_frame_color; p.approved_ral_color = row.legacy_frame_color; }
+          if (!p.approved_glass && row.legacy_glass_spec) { up.approved_glass = row.legacy_glass_spec; p.approved_glass = row.legacy_glass_spec; }
+          if (!p.install_date && row.legacy_install_date) { up.install_date = row.legacy_install_date; p.install_date = row.legacy_install_date; }
+          if (Object.keys(up).length) jobs.push(updateProjectRow(p.id, up));
+        });
+        return Promise.all(jobs).then(function () {
+          var linked = rows.filter(function (x) { return x.project_id; }).length;
+          toast('Imported ' + rows.length + ' drawing(s); ' + created + ' new project(s) created for drawings with no matching project', 'success');
+        });
+      });
+    }).then(function () { showDrawings(); });
+  });
+}
+
 function exportItemsCSV() {
   downloadCSV('items-' + (window.currentProjectData ? (window.currentProjectData.ref || window.currentProjectData.site_name) : 'project') + '.csv', currentProjectItems.map(function (i) {
     var cat = cache.categories.filter(function (c) { return c.id === i.category_id; })[0];
