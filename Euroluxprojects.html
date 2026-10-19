@@ -85,6 +85,11 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
   font-family: var(--font-sans); font-size: 0.8rem; background: var(--white); outline: none;
 }
 .search-bar { width: 240px; }
+.sb-wrap { position: relative; display: inline-flex; align-items: center; }
+.sb-wrap input { padding-right: 26px; }
+.sb-x { position: absolute; right: 6px; border: none; background: none; font-size: 1.15rem; line-height: 1; color: #888; cursor: pointer; padding: 0 2px; }
+.sb-x:hover { color: #000; }
+.sb-wrap input:placeholder-shown + .sb-x { display: none; }
 .search-bar:focus, .status-filter:focus { border-color: var(--black); }
 
 .stats-bar { display: flex; gap: 0.9rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
@@ -1248,7 +1253,7 @@ function renderProjectsList() {
       '</div>' +
     '</div>' +
     '<div class="search-wrap" style="margin-bottom:1rem;">' +
-      '<input type="text" class="search-bar" id="pf-search-input" placeholder="Search site, contractor, ref, client&hellip;" value="' + esc(projectsFilter.search) + '" oninput="onProjectsFilterChange()" />' +
+      '<span class="sb-wrap"><input type="text" class="search-bar" id="pf-search-input" placeholder="Search site, contractor, ref, client&hellip;" value="' + esc(projectsFilter.search) + '" oninput="onProjectsFilterChange()" /><button type="button" class="sb-x" title="Clear" onclick="clearSearch(\'pf-search-input\')">&times;</button></span>' +
       '<select class="status-filter" id="pf-status-input" onchange="onProjectsFilterChange()"><option value="">All Status</option>' +
         PROJECT_STATUSES.map(function (s) { return '<option ' + (s === projectsFilter.status ? 'selected' : '') + '>' + esc(s) + '</option>'; }).join('') +
       '</select>' +
@@ -1262,6 +1267,13 @@ function renderProjectsList() {
     '</div>' +
     '<div class="quotes-list-wrap" id="projects-rows">' + buildProjectsRowsHtml(filtered) + '</div>'
   );
+}
+function clearSearch(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.value = '';
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.focus();
 }
 function onProjectsFilterChange() {
   projectsFilter.search = document.getElementById('pf-search-input').value;
@@ -1511,7 +1523,7 @@ function renderDrawings() {
   render(
     '<div class="dashboard-header"><div>' + backButtonHtml() + '<h1>Drawings</h1><p>Drawing approvals for every project &mdash; client, RAL colour, glass and install date come from the project.</p></div>' +
       '<div class="search-wrap">' +
-        '<input type="text" id="dw-search" placeholder="Search project, client, designer&hellip;" value="' + esc(drawingsFilter.search) + '" oninput="setDrawingSearch(this.value)" />' +
+        '<span class="sb-wrap"><input type="text" id="dw-search" placeholder="Search project, client, designer&hellip;" value="' + esc(drawingsFilter.search) + '" oninput="setDrawingSearch(this.value)" /><button type="button" class="sb-x" title="Clear" onclick="clearSearch(\'dw-search\')">&times;</button></span>' +
         '<button class="btn btn-primary btn-sm" onclick="openDrawingForm(null)">+ Add Drawing</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="openDrawingsReport()">Report</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="exportDrawingsPDF()">PDF</button>' +
@@ -2413,7 +2425,7 @@ function renderSnapshot() {
         '<button class="btn btn-secondary btn-sm" onclick="exportSnapshotCSV()">Export CSV</button>' +
       '</div></div>' +
     '<div class="search-wrap" style="margin-bottom:1rem;">' +
-      '<input type="text" class="search-bar" id="sn-search" placeholder="Search project&hellip;" value="' + esc(snapFilter.search) + '" oninput="onSnapFilterChange(true)" />' +
+      '<span class="sb-wrap"><input type="text" class="search-bar" id="sn-search" placeholder="Search project&hellip;" value="' + esc(snapFilter.search) + '" oninput="onSnapFilterChange(true)" /><button type="button" class="sb-x" title="Clear" onclick="clearSearch(\'sn-search\')">&times;</button></span>' +
       '<select class="status-filter" id="sn-state" onchange="onSnapFilterChange()"><option value="">All delivery statuses</option>' + ['On Target', 'Delayed', 'Delivered'].map(function (o) { return '<option' + (o === snapFilter.state ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select>' +
       '<label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;"><input type="checkbox" id="sn-hidedone" ' + (snapFilter.hideDone ? 'checked' : '') + ' onchange="onSnapFilterChange()" style="width:auto;"> Hide completed tasks</label>' +
       '<label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;"><input type="checkbox" id="sn-completed" ' + (snapFilter.showCompleted ? 'checked' : '') + ' onchange="onSnapFilterChange()" style="width:auto;"> Include completed projects</label>' +
