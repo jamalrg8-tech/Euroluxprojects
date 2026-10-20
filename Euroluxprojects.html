@@ -355,7 +355,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
     <!-- Views are rendered here by JS -->
   </div>
 
-  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.31</div>
+  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.33</div>
 </div>
 
 <!-- ============================================
@@ -1221,7 +1221,7 @@ function applyProjectFilters(projects) {
 
 function buildProjectsRowsHtml(filtered) {
   return filtered.length ? (
-    '<table class="quotes-list"><thead><tr><th>Ref</th><th>Site / Project</th><th>Contractor</th><th>Status</th><th>Risk</th><th>Systems</th><th>Install Date</th><th class="r">Value</th></tr></thead><tbody>' +
+    '<table class="quotes-list"><thead><tr><th>Ref</th><th>Site / Project</th><th>Contractor</th><th>Status</th><th>Risk</th><th>Systems</th><th>Install Date</th><th class="r">Value</th><th></th></tr></thead><tbody>' +
     filtered.map(function (p) {
       return '<tr onclick="showProjectDetail(\'' + p.id + '\')">' +
         '<td class="muted">' + (esc(p.ref) || '&mdash;') + '</td>' +
@@ -1232,6 +1232,7 @@ function buildProjectsRowsHtml(filtered) {
         '<td class="muted">' + (esc((p.systems || []).join(', ')) || '&mdash;') + '</td>' +
         '<td class="muted">' + fmtDate(p.install_date) + '</td>' +
         '<td class="r">' + (p.project_value ? fmt(p.project_value) : '&mdash;') + '</td>' +
+        '<td onclick="event.stopPropagation()"><button class="btn btn-ghost btn-sm" style="color:#b91c1c;" onclick="deleteProjectById(\'' + p.id + '\')">Delete</button></td>' +
         '</tr>';
     }).join('') + '</tbody></table>'
   ) : '<div class="empty-state"><div class="icon">&#128193;</div><h3>No projects match</h3><p>Try clearing filters.</p></div>';
@@ -1409,6 +1410,7 @@ function renderProjectDetail(project, items) {
       '<div class="search-wrap">' +
         '<button class="btn btn-secondary btn-sm" onclick="window.print()">Print / PDF</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="openProjectForm(currentProjectData)">Edit</button>' +
+        '<button class="btn btn-ghost btn-sm" style="color:#b91c1c;" onclick="deleteProjectById(currentProjectData.id)">Delete project</button>' +
       '</div>' +
     '</div>' +
     '<div class="section-card">' +
@@ -1528,6 +1530,7 @@ function renderDrawings() {
         '<button class="btn btn-secondary btn-sm" onclick="openDrawingsReport()">Report</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="exportDrawingsPDF()">PDF</button>' +
         '<button class="btn btn-secondary btn-sm" onclick="exportDrawingsExcel()">Excel</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="showDuplicateProjects()" title="Find projects whose names contain the same words and merge them">Find duplicate projects</button>' +
         '<button class="btn btn-ghost btn-sm" onclick="importOldDrawings()" title="Bring in new drawings and refresh imported ones from the live old Drawing Tracker">Sync from old tracker</button>' +
       '</div></div>' +
     '<div class="dw-stats">' + stats + '</div>' +
@@ -1690,6 +1693,14 @@ function dwMatchProject(no, name, plist) {
   if (byNo.length === 1) return byNo[0];
   var byName = name ? plist.filter(function (p) { return String(p.site_name || '').trim().toLowerCase() === name; }) : [];
   if (byName.length === 1) return byName[0];
+  // same words in any order (numbers must match), then one name containing all words of the other
+  if (name) {
+    var probe = { site_name: name };
+    var same = [], similar = [];
+    plist.forEach(function (p) { var c = dupCompare(probe, p); if (c) (c.level === 'same' ? same : similar).push(p); });
+    if (same.length === 1) return same[0];
+    if (!same.length && similar.length === 1) return similar[0];
+  }
   return null;
 }
 function saveDrawingForm() {
@@ -1938,6 +1949,119 @@ function importOldDrawings() {
         toast('Synced: ' + fresh.length + ' added, ' + updated + ' updated, ' + created + ' new project(s) created', 'success');
       });
     }).then(function () { showDrawings(); });
+  });
+}
+
+
+// ---- duplicate projects: find (same words in the name) and merge ----
+var _dupPairs = [];
+function dupTokens(name) {
+  var seen = {}, out = [];
+  String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').split(' ').forEach(function (t) { if (t && !seen[t]) { seen[t] = 1; out.push(t); } });
+  return out;
+}
+function dupNums(toks) { return toks.filter(function (t) { return /\d/.test(t); }).sort().join(','); }
+function dupSubset(a, b) { return a.every(function (t) { return b.indexOf(t) !== -1; }); }
+function dupCompare(pa, pb) {
+  var a = dupTokens(pa.site_name), b = dupTokens(pb.site_name);
+  if (a.length < 2 || b.length < 2) return null;
+  if (dupNums(a) !== dupNums(b)) return null;
+  var level = null;
+  if (a.length === b.length && dupSubset(a, b)) level = 'same';
+  else if ((a.length < b.length && a.length >= 3 && dupSubset(a, b)) || (b.length < a.length && b.length >= 3 && dupSubset(b, a))) level = 'similar';
+  if (!level) return null;
+  var refA = String(pa.ref || '').trim().toLowerCase(), refB = String(pb.ref || '').trim().toLowerCase();
+  var conflict = !!(refA && refB && refA !== refB);
+  return { level: level, conflict: conflict };
+}
+function showDuplicateProjects() {
+  Promise.all([listProjects(), sb.from('items').select('project_id'), listDrawings()]).then(function (r) {
+    var projects = r[0], itemCount = {}, drawCount = {};
+    (r[1].data || []).forEach(function (i) { itemCount[i.project_id] = (itemCount[i.project_id] || 0) + 1; });
+    r[2].forEach(function (d) { if (d.project_id) drawCount[d.project_id] = (drawCount[d.project_id] || 0) + 1; });
+    var pairs = [];
+    for (var i = 0; i < projects.length; i++) for (var j = i + 1; j < projects.length; j++) {
+      var c = dupCompare(projects[i], projects[j]);
+      if (!c) continue;
+      var a = projects[i], b = projects[j];
+      var keep = (itemCount[a.id] || 0) > (itemCount[b.id] || 0) ? a : (itemCount[b.id] || 0) > (itemCount[a.id] || 0) ? b : (String(a.created_at) <= String(b.created_at) ? a : b);
+      var dup = keep === a ? b : a;
+      pairs.push({ keep: keep.id, dup: dup.id, level: c.level, conflict: c.conflict, on: c.level === 'same' });
+    }
+    _dupPairs = pairs;
+    window._dupInfo = { projects: projects, itemCount: itemCount, drawCount: drawCount };
+    renderDuplicateProjects();
+  }).catch(function (e) { toast('Could not scan projects: ' + e.message, 'error'); });
+}
+function dupProj(id) { return window._dupInfo.projects.filter(function (p) { return p.id === id; })[0]; }
+function dupCard(p, label, cls) {
+  var ic = window._dupInfo.itemCount[p.id] || 0, dc = window._dupInfo.drawCount[p.id] || 0;
+  return '<div style="flex:1;min-width:200px;padding:6px 10px;border-radius:6px;background:' + (cls === 'keep' ? '#ecfdf3' : '#fff7ed') + ';">' +
+    '<div style="font-size:0.66rem;font-weight:700;color:' + (cls === 'keep' ? '#15803d' : '#b45309') + ';">' + label + '</div>' +
+    '<div style="font-weight:700;font-size:0.82rem;">' + esc(p.site_name) + '</div>' +
+    '<div class="muted" style="font-size:0.72rem;">Ref: ' + (esc(p.ref) || '&mdash;') + ' &middot; ' + ic + ' item(s) &middot; ' + dc + ' drawing(s) &middot; ' + esc(p.status) + ' &middot; <button type="button" class="link-btn" style="color:#b91c1c;" onclick="event.preventDefault();deleteDupProject(\'' + p.id + '\')">delete this project</button></div></div>';
+}
+function renderDuplicateProjects() {
+  var rows = _dupPairs.map(function (pr, idx) {
+    var k = dupProj(pr.keep), d = dupProj(pr.dup);
+    return '<div style="border:1px solid #e5e5e5;border-radius:8px;padding:8px 10px;margin-bottom:8px;">' +
+      '<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;"><input type="checkbox" id="dup-' + idx + '"' + (pr.on ? ' checked' : '') + ' style="margin-top:4px;" />' +
+      '<div style="flex:1;"><div style="display:flex;gap:8px;flex-wrap:wrap;">' + dupCard(k, 'KEEP', 'keep') + dupCard(d, 'MERGE INTO THE ONE ON THE LEFT, THEN REMOVE THIS', 'dup') + '</div>' +
+      '<div style="font-size:0.7rem;margin-top:4px;color:' + (pr.conflict ? '#b91c1c' : '#666') + ';">' + (pr.level === 'same' ? 'Same words in the name' : 'One name contains all the words of the other') +
+      (pr.conflict ? ' &mdash; note: different project numbers; the kept project\'s number stays and the other number is saved in its notes' : '') + ' &nbsp;<button type="button" class="link-btn" onclick="swapDupPair(' + idx + ')">swap which one is kept</button></div></div></label></div>';
+  }).join('');
+  openListModal('Possible duplicate projects (' + _dupPairs.length + ')',
+    (_dupPairs.length ? '<p class="muted" style="font-size:0.78rem;margin-bottom:10px;">Merging moves all procurement items, drawings and updates to the kept project, fills any blank details on it from the other one, then deletes the other. Tick the pairs to merge. Pairs with exactly the same words are pre-ticked; check the others yourself.</p>' + rows +
+      '<div style="text-align:right;margin-top:10px;"><button class="btn btn-primary" onclick="mergeSelectedDuplicates()">Merge ticked pairs</button></div>'
+      : '<div class="empty-state">No projects with matching names found.</div>'));
+}
+function swapDupPair(idx) {
+  _dupPairs.forEach(function (p, i) { p.on = !!(document.getElementById('dup-' + i) || {}).checked; });
+  var p = _dupPairs[idx], t = p.keep; p.keep = p.dup; p.dup = t;
+  renderDuplicateProjects();
+}
+function deleteProjectById(id, after) {
+  Promise.all([getProject(id), listItems(id), listDrawings(id)]).then(function (r) {
+    var p = r[0];
+    confirmDialog('Delete "' + p.site_name + '" completely? This also deletes its ' + r[1].length + ' procurement item(s) and ' + r[2].length + ' drawing(s). This cannot be undone.', function () {
+      return deleteProjectRow(id).then(function () {
+        toast('Project deleted', 'success');
+        if (after) after(); else showProjects();
+      });
+    });
+  }).catch(function (e) { toast('Could not load project: ' + e.message, 'error'); });
+}
+function deleteDupProject(id) { closeListModal(); deleteProjectById(id, showDuplicateProjects); }
+function mergeProjects(keepId, dupId) {
+  var keep = dupProj(keepId), dup = dupProj(dupId);
+  function mv(table) { return sb.from(table).update({ project_id: keepId }).eq('project_id', dupId).then(function (r) { if (r.error) throw r.error; }); }
+  return getProject(dupId).then(function (dupFull) {
+    return getProject(keepId).then(function (keepFull) {
+      return mv('items').then(function () { return mv('drawings'); }).then(function () { return mv('project_updates'); }).then(function () {
+        return deleteProjectRow(dupId);
+      }).then(function () {
+        var fills = {};
+        ['ref', 'client', 'main_contractor', 'address_cluster', 'approved_ral_color', 'approved_glass', 'install_date', 'finish_date', 'design_signoff_date', 'contact_name', 'contact_phone', 'project_value'].forEach(function (f) {
+          var kv = keepFull[f], dv = dupFull[f];
+          if ((kv == null || String(kv).trim() === '') && dv != null && String(dv).trim() !== '') fills[f] = dv;
+        });
+        var dn = projectNoteEntries(dupFull);
+        if (dupFull.ref && keepFull.ref && String(dupFull.ref).trim().toLowerCase() !== String(keepFull.ref).trim().toLowerCase()) dn = dn.concat([{ date: todayISO(), text: 'Merged with duplicate project (project no. ' + dupFull.ref + ')' }]);
+        if (dn.length) { var all = projectNoteEntries(keepFull).concat(dn); fills.notes_log = all; fills.notes = notesToPlain(all); }
+        return Object.keys(fills).length ? updateProjectRow(keepId, fills) : null;
+      });
+    });
+  });
+}
+function mergeSelectedDuplicates() {
+  var chosen = _dupPairs.filter(function (p, i) { return document.getElementById('dup-' + i).checked; });
+  if (!chosen.length) { toast('Tick at least one pair', 'error'); return; }
+  closeListModal();
+  confirmDialog('Merge ' + chosen.length + ' pair(s) of projects? The duplicate project in each pair will be deleted after its items and drawings are moved. This cannot be undone.', function () {
+    var done = 0;
+    return chosen.reduce(function (chain, p) {
+      return chain.then(function () { return mergeProjects(p.keep, p.dup).then(function () { done++; }); });
+    }, Promise.resolve()).then(function () { toast('Merged ' + done + ' pair(s)', 'success'); showDrawings(); });
   });
 }
 
