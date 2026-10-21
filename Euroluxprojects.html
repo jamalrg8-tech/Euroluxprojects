@@ -159,6 +159,19 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
 .quotes-list tbody tr.snap-late { background: #fef2f2; }
 .quotes-list tbody tr.snap-cols th { background: #e9e9e5; color: #333; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; padding: 0.4rem 0.9rem; white-space: nowrap; }
 .rpt-late { color: #b91c1c; font-weight: 700; }
+.section-card.item-alt { background: #f0f0ee; }
+[id^="item-"], [id^="dw-row-"] { scroll-margin-top: 90px; }
+@keyframes flashbg { 0% { box-shadow: 0 0 0 3px #f59e0b; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.flash { animation: flashbg 1.8s ease-out; }
+.page-index { font-size: 0.8rem; line-height: 1.9; }
+.page-index .lbl { font-weight: 700; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: #666; margin-right: 6px; }
+.page-index .link-btn { margin-right: 14px; }
+.dw-notices { background: #fffbea; border: 1px solid #f3d98b; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; }
+.dw-notices .hd { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 0.8rem; margin-bottom: 6px; }
+.dw-notice { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 5px 0; border-top: 1px solid #f3e6b3; font-size: 0.8rem; }
+.dw-notice .x { border: none; background: none; font-size: 1.1rem; color: #888; cursor: pointer; }
+.xt-row { border: 1px solid #e3e3e0; border-radius: 6px; padding: 8px; margin-bottom: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #fafafa; }
+.xt-row .span2 { grid-column: 1 / span 2; }
 .dw-badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 0.68rem; font-weight: 700; color: #fff; white-space: nowrap; }
 .dw-stats { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 12px; }
 .dw-stat { border: 1px solid #ddd; background: #fff; border-radius: 16px; padding: 4px 12px; font-size: 0.76rem; cursor: pointer; }
@@ -355,7 +368,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
     <!-- Views are rendered here by JS -->
   </div>
 
-  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.33</div>
+  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.40</div>
 </div>
 
 <!-- ============================================
@@ -494,9 +507,10 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
         <div class="form-group full"><label>What Was Delivered</label><input type="text" id="if-delivered-details" placeholder="e.g. 8 of 12 panels" /></div>
         <div class="form-group full"><label>Task</label><textarea id="if-task" rows="3" placeholder="e.g. Confirm glass delivery slot"></textarea></div>
         <div class="form-group"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:normal;"><input type="checkbox" id="if-task-done" style="width:auto;" onchange="onItemTaskDoneChange()" /> Task completed</label></div>
-        <div class="form-group"><label>Date Completed</label><input type="date" id="if-task-done-date" /></div>
+        <div class="form-group"><label>Task Date Completion Date</label><input type="date" id="if-task-done-date" /></div>
         <div class="form-group"><label>Task Assigned To</label><input type="text" id="if-task-assignee" list="assignee-list" /></div>
         <div class="form-group"><label>Task Due Date</label><input type="date" id="if-task-due" /></div>
+        <div class="form-group full" id="if-extra-wrap"><div id="if-extra-tasks"></div><button type="button" class="btn btn-secondary btn-sm" id="if-add-task-btn" onclick="addExtraTaskRow()">+ Add another task</button></div>
         <div class="form-group"><label>PO Reference</label><input type="text" id="if-po-ref" /></div>
          <div class="form-group" id="if-glass-wrap" style="display:none;"><label>Approved Glass</label><input type="text" id="if-glass" list="glass-list" placeholder="Pick or type a new one" /></div>
          <div class="form-group" id="if-glazing-wrap" style="display:none;"><label>Glazing Type</label><input type="text" id="if-glazing" list="glazing-list" placeholder="Pick or type a new one" /></div>
@@ -1015,7 +1029,46 @@ function setActiveNav(route) {
     b.classList.toggle('active', b.dataset.route === route);
   });
 }
-function render(html) { document.getElementById('view-root').innerHTML = html; }
+function render(html) {
+  document.getElementById('view-root').innerHTML = html;
+  if (document.getElementById('dw-notices')) initDwNotices();
+}
+var _dwNotices = [];
+function dwDismissedMap() { try { return JSON.parse(localStorage.getItem('ppms_dw_dismissed') || '{}') || {}; } catch (e) { return {}; } }
+function initDwNotices() {
+  var since = new Date(Date.now() - 14 * 86400000).toISOString();
+  sb.from('drawings').select('id,project_id,drawing_status,previous_status,status_changed_at,rev_no').gte('status_changed_at', since).order('status_changed_at', { ascending: false }).then(function (r) {
+    _dwNotices = r.error ? [] : (r.data || []);
+    renderDwNotices();
+  });
+}
+function renderDwNotices() {
+  var box = document.getElementById('dw-notices'); if (!box) return;
+  var dis = dwDismissedMap();
+  var list = _dwNotices.filter(function (n) { return dis[n.id] !== n.status_changed_at; });
+  if (!list.length) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="dw-notices"><div class="hd"><span>&#128221; Drawing updates (' + list.length + ')</span><button type="button" class="link-btn" onclick="dismissAllDwNotices()">Dismiss all</button></div>' +
+    list.map(function (n) {
+      var p = (_allProjectsCache || []).filter(function (x) { return x.id === n.project_id; })[0];
+      var name = p ? p.site_name : 'Unlinked drawing';
+      var what = n.previous_status ? 'status changed from ' + esc(dwLabel(n.previous_status)) + ' to ' : 'new drawing added with status ';
+      return '<div class="dw-notice"><div>' + (p ? '<button type="button" class="link-btn" onclick="showProjectDetail(\'' + p.id + '\')"><b>' + esc(name) + '</b></button>' : '<b>' + esc(name) + '</b>') +
+        ' &mdash; drawing ' + (n.rev_no ? 'Rev ' + esc(n.rev_no) + ' ' : '') + what + dwBadge(n.drawing_status) + ' <span class="muted" style="font-size:0.7rem;">' + fmtDatePlain(String(n.status_changed_at).slice(0, 10)) + '</span></div>' +
+        '<button type="button" class="x" title="Dismiss" onclick="dismissDwNotice(\'' + n.id + '\')">&times;</button></div>';
+    }).join('') + '</div>';
+}
+function dismissDwNotice(id) {
+  var dis = dwDismissedMap(), n = _dwNotices.filter(function (x) { return x.id === id; })[0];
+  if (n) dis[id] = n.status_changed_at;
+  try { localStorage.setItem('ppms_dw_dismissed', JSON.stringify(dis)); } catch (e) {}
+  renderDwNotices();
+}
+function dismissAllDwNotices() {
+  var dis = dwDismissedMap();
+  _dwNotices.forEach(function (n) { dis[n.id] = n.status_changed_at; });
+  try { localStorage.setItem('ppms_dw_dismissed', JSON.stringify(dis)); } catch (e) {}
+  renderDwNotices();
+}
 
 // ============================================
 // CONFIRM DIALOG
@@ -1081,6 +1134,7 @@ function renderDashboard(projects, items) {
     '<div class="dashboard-header"><div><h1>Dashboard</h1><p>Portfolio overview across all projects and procurement items.</p></div>' +
       '<div class="search-wrap"><a class="btn btn-secondary btn-sm" href="' + INVENTORY_APP_URL + '" target="_blank" rel="noopener">Inventory &amp; Stock App &rarr;</a></div>' +
     '</div>' +
+    '<div id="dw-notices"></div>' +
     '<div class="stats-bar">' +
       '<div class="stat-pill" style="cursor:pointer;" onclick="goToProjectsWithStatus(\'\')" title="View all projects"><strong>' + projects.length + '</strong>Total Projects</div>' +
       '<div class="stat-pill good" style="cursor:pointer;" onclick="goToProjectsWithStatus(\'Completed / Handed Over\')" title="View completed projects"><strong>' + completed.length + '</strong>Completed</div>' +
@@ -1149,7 +1203,7 @@ function itemsTableHtml(rows) {
     rows.map(function (i) {
       var risk = itemRisk(i);
       return '<tr onclick="closeListModal();showProjectDetail(\'' + i.project_id + '\')">' +
-        '<td>' + esc(i.description) + '</td>' +
+        '<td>' + esc(i.description) + extraTasksBadge(i) + '</td>' +
         '<td>' + esc(i.site_name || '') + '</td>' +
         '<td>' + (esc(i.supplier_name) || '&mdash;') + '</td>' +
         '<td class="muted">' + fmtDate(i.required_delivery) + '</td>' +
@@ -1253,6 +1307,7 @@ function renderProjectsList() {
         '<button class="btn btn-primary btn-sm" onclick="openProjectForm(null)">+ New Project</button>' +
       '</div>' +
     '</div>' +
+    '<div id="dw-notices"></div>' +
     '<div class="search-wrap" style="margin-bottom:1rem;">' +
       '<span class="sb-wrap"><input type="text" class="search-bar" id="pf-search-input" placeholder="Search site, contractor, ref, client&hellip;" value="' + esc(projectsFilter.search) + '" oninput="onProjectsFilterChange()" /><button type="button" class="sb-x" title="Clear" onclick="clearSearch(\'pf-search-input\')">&times;</button></span>' +
       '<select class="status-filter" id="pf-status-input" onchange="onProjectsFilterChange()"><option value="">All Status</option>' +
@@ -1335,8 +1390,29 @@ function isGlassCategory(categoryId) {
   var c = cache.categories.filter(function (x) { return x.id === categoryId; })[0];
   return !!c && String(c.name).trim().toLowerCase() === 'glass';
 }
+function jumpTo(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}
+function projectIndexHtml(items) {
+  var ds = window.currentProjectDrawings || [];
+  if (!items.length && !ds.length) return '';
+  var dl = ds.map(function (d, n) {
+    return '<button type="button" class="link-btn" onclick="jumpTo(\'dw-row-' + d.id + '\')">Drawing ' + (d.rev_no ? 'Rev ' + esc(d.rev_no) : '#' + (n + 1)) + ' &ndash; ' + esc(dwLabel(d.drawing_status)) + '</button>';
+  }).join('');
+  var il = items.map(function (i) {
+    return '<button type="button" class="link-btn" onclick="jumpTo(\'item-' + i.id + '\')">' + esc(i.description) + '</button>';
+  }).join('');
+  return '<div class="section-card page-index">' +
+    (ds.length ? '<div><span class="lbl">Drawings</span>' + dl + '</div>' : '') +
+    (items.length ? '<div><span class="lbl">Procurement items</span>' + il + '</div>' : '') + '</div>';
+}
+var _altItemN = 0;
 function renderProjectDetail(project, items) {
   currentProjectItems = items;
+  _altItemN = 0;
   var progress = projectProgress(project, items);
   var grouped = {};
   items.forEach(function (i) {
@@ -1367,12 +1443,13 @@ function renderProjectDetail(project, items) {
       return '<div style="font-weight:700;font-size:0.85rem;margin:1.1rem 0 0.6rem;display:flex;justify-content:space-between;">' + esc(cat) + '<span class="muted" style="font-weight:500;">' + fmt(catTotal) + '</span></div>' +
         catItems.map(function (i) {
           var risk = itemRisk(i);
+          var altCls = (_altItemN++ % 2) ? ' item-alt' : '';
           if (isItemHidden(i.id)) {
-            return '<div class="section-card item-collapsed"><div><span class="t">' + esc(i.description) + '</span> ' + statusBadge(i.item_status) + (risk.label ? '<span class="risk-flag ' + risk.level + '">' + risk.label + '</span>' : '') +
+            return '<div class="section-card item-collapsed' + altCls + '" id="item-' + i.id + '"><div><span class="t">' + esc(i.description) + '</span> ' + statusBadge(i.item_status) + (risk.label ? '<span class="risk-flag ' + risk.level + '">' + risk.label + '</span>' : '') +
               '<span class="muted" style="font-size:0.76rem;margin-left:10px;">' + (i.total_cost != null ? fmt(i.total_cost) : '') + '</span></div>' +
               '<button class="btn btn-ghost btn-sm" onclick="toggleItemHidden(\'' + i.id + '\')">Show</button></div>';
           }
-          return '<div class="section-card" style="margin-bottom:10px;">' +
+          return '<div class="section-card' + altCls + '" id="item-' + i.id + '" style="margin-bottom:10px;">' +
             '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">' +
               '<div><div style="font-weight:700;">' + esc(i.description) + '</div>' +
                 '<div style="margin-top:4px;">' + statusBadge(i.item_status) + (risk.label ? '<span class="risk-flag ' + risk.level + '">' + risk.label + '</span>' : '') + '</div>' +
@@ -1395,6 +1472,7 @@ function renderProjectDetail(project, items) {
               (i.delivery_completion ? '<div class="detail-item"><div class="k">Delivery Completed</div><div class="v">' + esc(i.delivery_completion) + '</div></div>' : '') +
               (i.delivered_details ? '<div class="detail-item"><div class="k">What Was Delivered</div><div class="v">' + esc(i.delivered_details) + '</div></div>' : '') +
               (i.task_text ? '<div class="detail-item"><div class="k">Task' + (i.task_completed ? ' (completed ' + fmtDatePlain(i.task_completed_date) + ')' : '') + '</div><div class="v' + (i.task_completed ? ' task-done-text' : '') + '" style="white-space:pre-wrap;">' + esc(i.task_text) + '</div></div><div class="detail-item"><div class="k">Assigned To</div><div class="v">' + (esc(i.task_assignee) || '&mdash;') + '</div></div><div class="detail-item"><div class="k">Task Due</div><div class="v"' + (taskIsUrgent(i) ? ' style="color:#b91c1c;font-weight:700;"' : '') + '>' + fmtDate(i.task_due_date) + (taskIsUrgent(i) ? ' &#9888;' : '') + '</div></div>' : '') +
+              extraTasksCardHtml(i) +
               (i.sorex_required ? '<div class="detail-item"><div class="k">SOREX Required</div><div class="v">' + esc(i.sorex_required) + '</div></div>' : '') +
               (i.winhaus_lock_position ? '<div class="detail-item"><div class="k">WINHAUS Lock Position</div><div class="v">' + esc(i.winhaus_lock_position) + '</div></div>' : '') +
             '</div>' +
@@ -1413,6 +1491,7 @@ function renderProjectDetail(project, items) {
         '<button class="btn btn-ghost btn-sm" style="color:#b91c1c;" onclick="deleteProjectById(currentProjectData.id)">Delete project</button>' +
       '</div>' +
     '</div>' +
+    projectIndexHtml(items) +
     '<div class="section-card">' +
       '<div class="detail-grid">' +
         '<div class="detail-item"><div class="k">Status</div><div class="v">' + statusBadge(project.status) + '</div></div>' +
@@ -1730,6 +1809,9 @@ function saveDrawingForm() {
     updated_at: new Date().toISOString()
   };
   if (payload.drawing_status === 'Approved' && !payload.approval_date) { toast('Enter the approval date', 'error'); return; }
+  var oldDw = window._dwEditing && editingDrawingId ? window._dwEditing : null;
+  if (!oldDw) { payload.previous_status = null; payload.status_changed_at = new Date().toISOString(); }
+  else if (oldDw.drawing_status !== payload.drawing_status) { payload.previous_status = oldDw.drawing_status; payload.status_changed_at = new Date().toISOString(); }
   var proj = dwProjectList().filter(function (x) { return x.id === pid; })[0];
   // shared details go to the project (single source of truth) when they changed
   var shared = {};
@@ -1771,7 +1853,7 @@ function dwProjectSectionHtml() {
   var pid = window.currentProjectData ? window.currentProjectData.id : currentProjectId;
   var rows = ds.length ? '<div class="quotes-list-wrap"><table class="quotes-list"><thead><tr><th>Rev</th><th>Status</th><th>Designer</th><th>Submitted</th><th>Approved</th><th>Frame Supplier</th><th>Action Required</th><th></th></tr></thead><tbody>' +
     ds.map(function (d) {
-      return '<tr onclick="viewDrawing(\'' + d.id + '\')"><td>' + (esc(d.rev_no) || '&mdash;') + '</td><td>' + dwBadge(d.drawing_status) + '</td><td>' + (esc(d.designer) || '&mdash;') + '</td>' +
+      return '<tr id="dw-row-' + d.id + '" onclick="viewDrawing(\'' + d.id + '\')"><td>' + (esc(d.rev_no) || '&mdash;') + '</td><td>' + dwBadge(d.drawing_status) + '</td><td>' + (esc(d.designer) || '&mdash;') + '</td>' +
         '<td class="muted">' + fmtDate(d.submission_date) + '</td><td class="muted">' + fmtDate(d.approval_date) + '</td><td class="muted">' + (esc(d.frame_suppliers) || '&mdash;') + '</td>' +
         '<td class="muted">' + (esc(d.action_required) || '&mdash;') + '</td>' +
         '<td onclick="event.stopPropagation()"><button class="btn btn-ghost btn-sm" onclick="openDrawingForm(\'' + d.id + '\')">Edit</button></td></tr>';
@@ -1927,6 +2009,7 @@ function importOldDrawings() {
           if (res.error) throw res.error;
           return Promise.all(toUpdate.map(function (m) {
             var up = Object.assign({}, m.row, { updated_at: new Date().toISOString() });
+            if (m.had.drawing_status !== up.drawing_status) { up.previous_status = m.had.drawing_status; up.status_changed_at = new Date().toISOString(); }
             if (m.had.project_id) up.project_id = m.had.project_id; // keep the existing project link
             else if (!up.project_id) delete up.project_id;
             return sb.from('drawings').update(up).eq('legacy_id', String(m.o.id)).then(function (u) { if (u.error) throw u.error; updated++; m.row = up; });
@@ -2298,12 +2381,42 @@ function openItemForm(item, mode) {
   document.getElementById('if-glazing').value = isEdit ? (item.glazing_type || '') : '';
   document.getElementById('glazing-list').innerHTML = cache.glazingTypes.map(function (g) { return '<option value="' + esc(g.name) + '">'; }).join('');
   renderNoteLines(isEdit ? itemNoteEntries(item) : [], 'if-notes-lines');
+  renderExtraTasks(isEdit ? (item.tasks_extra || []) : []);
   document.getElementById('if-sorex').value = isEdit ? (item.sorex_required || '') : '';
   document.getElementById('if-winhaus').value = isEdit ? (item.winhaus_lock_position || '') : '';
   editingItemId = isEdit ? item.id : null;
   onItemCategoryChange();
   setItemFormReadOnly(mode === 'view');
   document.getElementById('item-modal').classList.add('open');
+}
+function extraTaskRowHtml(t) {
+  t = t || {};
+  return '<div class="xt-row">' +
+    '<textarea class="xt-text span2" rows="2" placeholder="Additional task">' + esc(t.text || '') + '</textarea>' +
+    '<input type="text" class="xt-assignee" list="assignee-list" placeholder="Assigned to" value="' + esc(t.assignee || '') + '" />' +
+    '<input type="date" class="xt-due" title="Task due date" value="' + esc(t.due || '') + '" />' +
+    '<label style="display:flex;align-items:center;gap:6px;font-size:0.76rem;"><input type="checkbox" class="xt-done" style="width:auto;" onchange="onExtraTaskDone(this)"' + (t.done ? ' checked' : '') + ' /> Task completed</label>' +
+    '<div style="display:flex;gap:6px;align-items:center;"><span class="muted" style="font-size:0.68rem;white-space:nowrap;">Task Date Completion Date</span><input type="date" class="xt-done-date" value="' + esc(t.done_date || '') + '" /></div>' +
+    '<div class="span2" style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm xt-remove" style="color:#b91c1c;" onclick="this.closest(\'.xt-row\').remove()">Remove task</button></div>' +
+  '</div>';
+}
+function renderExtraTasks(list) { document.getElementById('if-extra-tasks').innerHTML = (list || []).map(extraTaskRowHtml).join(''); }
+function addExtraTaskRow() {
+  var box = document.getElementById('if-extra-tasks');
+  box.insertAdjacentHTML('beforeend', extraTaskRowHtml({}));
+  var ta = box.querySelectorAll('.xt-text'); if (ta.length) ta[ta.length - 1].focus();
+}
+function onExtraTaskDone(cb) {
+  var row = cb.closest('.xt-row'), dt = row.querySelector('.xt-done-date');
+  if (cb.checked && !dt.value) dt.value = todayISO();
+  if (!cb.checked) dt.value = '';
+}
+function collectExtraTasks() {
+  return Array.prototype.map.call(document.querySelectorAll('#if-extra-tasks .xt-row'), function (row) {
+    var done = row.querySelector('.xt-done').checked;
+    return { text: row.querySelector('.xt-text').value.trim(), assignee: row.querySelector('.xt-assignee').value.trim(), due: row.querySelector('.xt-due').value || '',
+             done: done, done_date: done ? (row.querySelector('.xt-done-date').value || todayISO()) : '' };
+  }).filter(function (t) { return t.text || t.assignee; });
 }
 function onItemTaskDoneChange() {
   var on = document.getElementById('if-task-done').checked, dt = document.getElementById('if-task-done-date');
@@ -2331,6 +2444,8 @@ function setItemFormReadOnly(readOnly) {
   });
   Array.prototype.forEach.call(document.querySelectorAll('#if-notes-lines input, #if-notes-lines textarea, #if-notes-lines button'), function (el) { el.disabled = readOnly; });
   document.getElementById('if-add-note-btn').style.display = readOnly ? 'none' : '';
+  Array.prototype.forEach.call(document.querySelectorAll('#if-extra-tasks input, #if-extra-tasks textarea, #if-extra-tasks button'), function (el) { el.disabled = readOnly; });
+  document.getElementById('if-add-task-btn').style.display = readOnly ? 'none' : '';
   document.getElementById('if-close-btn').style.display = readOnly ? 'inline-flex' : 'none';
   document.getElementById('if-cancel-btn').style.display = readOnly ? 'none' : 'inline-flex';
   document.getElementById('if-edit-btn').style.display = readOnly ? 'inline-flex' : 'none';
@@ -2371,6 +2486,7 @@ function saveItem() {
     task_completed_date: document.getElementById('if-task-done').checked ? (document.getElementById('if-task-done-date').value || todayISO()) : null,
     task_assignee: document.getElementById('if-task-assignee').value.trim() || null,
     task_due_date: document.getElementById('if-task-due').value || null,
+    tasks_extra: collectExtraTasks(),
     sorex_required: needsSorexWinhaus ? (document.getElementById('if-sorex').value || null) : null,
     winhaus_lock_position: needsSorexWinhaus ? (document.getElementById('if-winhaus').value || null) : null
   };
@@ -2406,10 +2522,26 @@ function deleteItemConfirm(id, desc) {
 var TASK_ALERT_DAYS = 10; // tasks due within this many days (or overdue) show in red
 var snapFilter = { search: '', state: '', showCompleted: false, mode: 'edit', attention: false, hideDone: false };
 var SNAP_COLS = ['', '', 'Product', 'Delivery Date', 'Status', 'Task', 'Completed', 'Assigned To', 'Task Due'];
+function extraTaskUrgent(t) {
+  return !!(t && !t.done && t.due && (t.text || t.assignee) && daysBetween(todayISO(), t.due) <= TASK_ALERT_DAYS);
+}
 function taskIsUrgent(item) {
-  if (!item || !item.task_due_date || item.task_completed) return false;
-  if (!item.task_text && !item.task_assignee) return false;
-  return daysBetween(todayISO(), item.task_due_date) <= TASK_ALERT_DAYS;
+  if (!item) return false;
+  if (item.task_due_date && !item.task_completed && (item.task_text || item.task_assignee) && daysBetween(todayISO(), item.task_due_date) <= TASK_ALERT_DAYS) return true;
+  return (item.tasks_extra || []).some(extraTaskUrgent);
+}
+function extraTasksCount(item) { return (item && item.tasks_extra ? item.tasks_extra.length : 0); }
+function extraTasksBadge(item) {
+  var n = extraTasksCount(item);
+  return n ? '<div class="muted" style="font-size:0.68rem;">+ ' + n + ' more task' + (n === 1 ? '' : 's') + ' (open the item to view)</div>' : '';
+}
+function extraTasksCardHtml(i) {
+  return (i.tasks_extra || []).map(function (t, n) {
+    var urgent = extraTaskUrgent(t);
+    return '<div class="detail-item"><div class="k">Task ' + (n + 2) + (t.done ? ' (completed ' + fmtDatePlain(t.done_date) + ')' : '') + '</div><div class="v' + (t.done ? ' task-done-text' : '') + '" style="white-space:pre-wrap;">' + esc(t.text) + '</div></div>' +
+      '<div class="detail-item"><div class="k">Assigned To</div><div class="v">' + (esc(t.assignee) || '&mdash;') + '</div></div>' +
+      '<div class="detail-item"><div class="k">Task Due</div><div class="v"' + (urgent ? ' style="color:#b91c1c;font-weight:700;"' : '') + '>' + fmtDate(t.due) + (urgent ? ' &#9888;' : '') + '</div></div>';
+  }).join('');
 }
 function autosizeTa(el) { if (el && el.scrollHeight > 0) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }
 function autosizeAllTa() { Array.prototype.forEach.call(document.querySelectorAll('textarea.snap-ta'), autosizeTa); }
@@ -2442,7 +2574,7 @@ function snapItemRowHtml(i) {
   var stOpts = ['On Target', 'Delayed', 'Delivered'].map(function (o) { return '<option' + (o === st ? ' selected' : '') + '>' + o + '</option>'; }).join('');
   var head = '<tr id="sr-' + i.id + '" class="' + (urgent ? 'snap-late' : '') + '">' +
     '<td></td><td></td>' +
-    '<td>' + esc(i.description) + '</td>' +
+    '<td>' + esc(i.description) + extraTasksBadge(i) + '</td>' +
     '<td><input type="date" class="cell-input" data-id="' + i.id + '" data-f="required_delivery" value="' + esc(i.required_delivery || '') + '" onchange="snapItemEdit(this)" /></td>' +
     '<td><select class="cell-input" id="ss-' + i.id + '" data-id="' + i.id + '" onchange="snapStateEdit(this)">' + stOpts + '</select></td>';
   if (snapTaskHidden(i)) {
@@ -2459,7 +2591,7 @@ function snapItemRowHtml(i) {
 function snapItemReportRowHtml(i) {
   var st = deliveryState(i), urgent = taskIsUrgent(i);
   var head = '<tr class="' + (urgent ? 'snap-late' : '') + '"><td></td><td></td>' +
-    '<td>' + esc(i.description) + '</td>' +
+    '<td>' + esc(i.description) + extraTasksBadge(i) + '</td>' +
     '<td>' + fmtDate(i.required_delivery) + '</td>' +
     '<td>' + statusBadge(st) + '</td>';
   if (snapTaskHidden(i)) return head + '<td colspan="4"><span class="task-hidden">Completed task hidden</span></td></tr>';
