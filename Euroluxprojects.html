@@ -368,7 +368,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
     <!-- Views are rendered here by JS -->
   </div>
 
-  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.40</div>
+  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.41</div>
 </div>
 
 <!-- ============================================
@@ -1051,9 +1051,9 @@ function renderDwNotices() {
     list.map(function (n) {
       var p = (_allProjectsCache || []).filter(function (x) { return x.id === n.project_id; })[0];
       var name = p ? p.site_name : 'Unlinked drawing';
-      var what = n.previous_status ? 'status changed from ' + esc(dwLabel(n.previous_status)) + ' to ' : 'new drawing added with status ';
+      var what = !n.previous_status ? 'new drawing added, status ' : (n.previous_status === n.drawing_status ? 'drawing updated, status ' : 'status changed from ' + esc(dwLabel(n.previous_status)) + ' to ');
       return '<div class="dw-notice"><div>' + (p ? '<button type="button" class="link-btn" onclick="showProjectDetail(\'' + p.id + '\')"><b>' + esc(name) + '</b></button>' : '<b>' + esc(name) + '</b>') +
-        ' &mdash; drawing ' + (n.rev_no ? 'Rev ' + esc(n.rev_no) + ' ' : '') + what + dwBadge(n.drawing_status) + ' <span class="muted" style="font-size:0.7rem;">' + fmtDatePlain(String(n.status_changed_at).slice(0, 10)) + '</span></div>' +
+        ' &mdash; ' + (n.previous_status && n.previous_status !== n.drawing_status ? 'drawing ' : '') + (n.rev_no ? 'Rev ' + esc(n.rev_no) + ' ' : '') + what + dwBadge(n.drawing_status) + ' <span class="muted" style="font-size:0.7rem;">' + fmtDatePlain(String(n.status_changed_at).slice(0, 10)) + '</span></div>' +
         '<button type="button" class="x" title="Dismiss" onclick="dismissDwNotice(\'' + n.id + '\')">&times;</button></div>';
     }).join('') + '</div>';
 }
@@ -1811,7 +1811,7 @@ function saveDrawingForm() {
   if (payload.drawing_status === 'Approved' && !payload.approval_date) { toast('Enter the approval date', 'error'); return; }
   var oldDw = window._dwEditing && editingDrawingId ? window._dwEditing : null;
   if (!oldDw) { payload.previous_status = null; payload.status_changed_at = new Date().toISOString(); }
-  else if (oldDw.drawing_status !== payload.drawing_status) { payload.previous_status = oldDw.drawing_status; payload.status_changed_at = new Date().toISOString(); }
+  else { payload.previous_status = oldDw.drawing_status; payload.status_changed_at = new Date().toISOString(); } // same status = plain update
   var proj = dwProjectList().filter(function (x) { return x.id === pid; })[0];
   // shared details go to the project (single source of truth) when they changed
   var shared = {};
