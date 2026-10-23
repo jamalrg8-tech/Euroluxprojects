@@ -368,7 +368,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
     <!-- Views are rendered here by JS -->
   </div>
 
-  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.41</div>
+  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.43</div>
 </div>
 
 <!-- ============================================
@@ -412,7 +412,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
         <div class="form-group"><label>Approved RAL Color</label><input type="text" id="pf-ral" placeholder="e.g. RAL 9016M" /></div>
         <div class="form-group"><label>Approved Glass</label><input type="text" id="pf-glass" list="pf-glass-list" placeholder="Pick or type a new one" /></div>
         <div class="form-group"><label>Design Approved Date</label><input type="date" id="pf-design-date" onchange="onDesignDateChange()" /></div>
-        <div class="form-group"><label>Site Contact Name</label><input type="text" id="pf-contact-name" /></div>
+        <div class="form-group"><label id="pf-contact-name-lbl">Site Contact Name</label><input type="text" id="pf-contact-name" /></div>
         <div class="form-group"><label>Site Contact Phone</label><input type="tel" id="pf-contact-phone" placeholder="+971 50 000 0000" /></div>
       </div>
       <div class="form-group full" style="margin-top:1rem;">
@@ -491,7 +491,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
         </div>
         <div class="form-group"><label>Quantity</label><input type="number" id="if-qty" value="1" step="0.01" /></div>
         <div class="form-group"><label>Unit of Measure</label><input type="text" id="if-uom" list="uom-list" /></div>
-        <div class="form-group"><label>Cost per Unit (AED)</label><input type="number" id="if-unit-cost" step="0.01" /></div>
+        <div class="form-group"><label>Total Cost (AED)</label><input type="number" id="if-total-cost" step="0.01" /></div>
         <div class="form-group">
           <label>Item Status</label>
           <select id="if-status">
@@ -506,10 +506,10 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
         <div class="form-group"><label>Delivery Completed</label><select id="if-delivery-completion"><option value="">&mdash;</option><option>Full</option><option>Partial</option></select></div>
         <div class="form-group full"><label>What Was Delivered</label><input type="text" id="if-delivered-details" placeholder="e.g. 8 of 12 panels" /></div>
         <div class="form-group full"><label>Task</label><textarea id="if-task" rows="3" placeholder="e.g. Confirm glass delivery slot"></textarea></div>
-        <div class="form-group"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:normal;"><input type="checkbox" id="if-task-done" style="width:auto;" onchange="onItemTaskDoneChange()" /> Task completed</label></div>
-        <div class="form-group"><label>Task Date Completion Date</label><input type="date" id="if-task-done-date" /></div>
         <div class="form-group"><label>Task Assigned To</label><input type="text" id="if-task-assignee" list="assignee-list" /></div>
         <div class="form-group"><label>Task Due Date</label><input type="date" id="if-task-due" /></div>
+        <div class="form-group"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:normal;"><input type="checkbox" id="if-task-done" style="width:auto;" onchange="onItemTaskDoneChange()" /> Task completed</label></div>
+        <div class="form-group"><label>Task Date Completion Date</label><input type="date" id="if-task-done-date" /></div>
         <div class="form-group full" id="if-extra-wrap"><div id="if-extra-tasks"></div><button type="button" class="btn btn-secondary btn-sm" id="if-add-task-btn" onclick="addExtraTaskRow()">+ Add another task</button></div>
         <div class="form-group"><label>PO Reference</label><input type="text" id="if-po-ref" /></div>
          <div class="form-group" id="if-glass-wrap" style="display:none;"><label>Approved Glass</label><input type="text" id="if-glass" list="glass-list" placeholder="Pick or type a new one" /></div>
@@ -1460,7 +1460,6 @@ function renderProjectDetail(project, items) {
               '<div class="detail-item"><div class="k">Category</div><div class="v">' + esc(categoryName(i.category_id)) + '</div></div>' +
               '<div class="detail-item"><div class="k">Supplier</div><div class="v">' + esc(supplierName(i.supplier_id)) + '</div></div>' +
               '<div class="detail-item"><div class="k">Quantity</div><div class="v">' + (i.qty != null ? i.qty : '&mdash;') + (i.uom ? ' ' + esc(i.uom) : '') + '</div></div>' +
-              '<div class="detail-item"><div class="k">Cost per Unit</div><div class="v">' + (i.unit_cost != null ? fmt(i.unit_cost) : '&mdash;') + '</div></div>' +
               '<div class="detail-item"><div class="k">Total Cost</div><div class="v">' + (i.total_cost != null ? fmt(i.total_cost) : '&mdash;') + '</div></div>' +
               '<div class="detail-item"><div class="k">Purchase Date</div><div class="v">' + fmtDate(i.purchase_date) + '</div></div>' +
               '<div class="detail-item"><div class="k">Lead Time</div><div class="v">' + (i.lead_time_days != null ? i.lead_time_days + ' days' : '&mdash;') + '</div></div>' +
@@ -2152,7 +2151,7 @@ function exportItemsCSV() {
   downloadCSV('items-' + (window.currentProjectData ? (window.currentProjectData.ref || window.currentProjectData.site_name) : 'project') + '.csv', currentProjectItems.map(function (i) {
     var cat = cache.categories.filter(function (c) { return c.id === i.category_id; })[0];
     var sup = cache.suppliers.filter(function (s) { return s.id === i.supplier_id; })[0];
-    return { Description: i.description, Category: cat ? cat.name : '', Supplier: sup ? sup.name : '', Qty: i.qty, UOM: i.uom, UnitCost: i.unit_cost, TotalCost: i.total_cost, PurchaseDate: i.purchase_date, LeadTimeDays: i.lead_time_days, RequiredDelivery: i.required_delivery, ActualDelivery: i.actual_delivery, PORef: i.po_ref, ApprovedGlass: i.approved_glass, GlazingType: i.glazing_type, SorexRequired: i.sorex_required, WinhausLockPosition: i.winhaus_lock_position, DeliveryCompleted: i.delivery_completion, WhatWasDelivered: i.delivered_details, Task: i.task_text, TaskAssignedTo: i.task_assignee, TaskDue: i.task_due_date, TaskCompleted: i.task_completed ? 'Yes' : 'No', TaskCompletedOn: i.task_completed_date, Status: i.item_status };
+    return { Description: i.description, Category: cat ? cat.name : '', Supplier: sup ? sup.name : '', Qty: i.qty, UOM: i.uom, TotalCost: i.total_cost, PurchaseDate: i.purchase_date, LeadTimeDays: i.lead_time_days, RequiredDelivery: i.required_delivery, ActualDelivery: i.actual_delivery, PORef: i.po_ref, ApprovedGlass: i.approved_glass, GlazingType: i.glazing_type, SorexRequired: i.sorex_required, WinhausLockPosition: i.winhaus_lock_position, DeliveryCompleted: i.delivery_completion, WhatWasDelivered: i.delivered_details, Task: i.task_text, TaskAssignedTo: i.task_assignee, TaskDue: i.task_due_date, TaskCompleted: i.task_completed ? 'Yes' : 'No', TaskCompletedOn: i.task_completed_date, Status: i.item_status };
   }));
 }
 
@@ -2253,6 +2252,7 @@ function toggleNoteHidden(kind, id, idx) {
 function openProjectForm(project) {
   var isEdit = !!(project && project.id);
   document.getElementById('project-modal-ttl').textContent = isEdit ? 'Edit Project' : 'New Project';
+  document.getElementById('pf-contact-name-lbl').textContent = isEdit ? 'Site Contact Name' : 'Site Contact Name *';
   document.getElementById('pf-site').value = isEdit ? (project.site_name || '') : '';
   document.getElementById('pf-ref').value = isEdit ? (project.ref || '') : '';
   document.getElementById('pf-contractor').value = isEdit ? (project.main_contractor || '') : '';
@@ -2290,6 +2290,11 @@ function closeProjectForm() { document.getElementById('project-modal').classList
 function saveProject() {
   var site = document.getElementById('pf-site').value.trim();
   if (!site) { toast('Site / project name is required', 'error'); return; }
+  if (!window._editingProjectId && !document.getElementById('pf-contact-name').value.trim()) {
+    toast('Please enter the Site Contact Name before saving a new project', 'error');
+    document.getElementById('pf-contact-name').focus();
+    return;
+  }
   var payload = {
     site_name: site,
     ref: document.getElementById('pf-ref').value.trim() || null,
@@ -2361,7 +2366,7 @@ function openItemForm(item, mode) {
   document.getElementById('if-qty').value = isEdit && item.qty != null ? item.qty : 1;
   document.getElementById('if-uom').value = isEdit ? (item.uom || '') : '';
   document.getElementById('uom-list').innerHTML = cache.units.map(function (u) { return '<option value="' + esc(u.name) + '">'; }).join('');
-  document.getElementById('if-unit-cost').value = isEdit && item.unit_cost != null ? item.unit_cost : '';
+  document.getElementById('if-total-cost').value = isEdit && item.total_cost != null ? item.total_cost : '';
   document.getElementById('if-status').value = isEdit ? (item.item_status || 'Not Started') : 'Not Started';
   document.getElementById('if-purchase-date').value = isEdit ? (item.purchase_date || '') : '';
   document.getElementById('if-lead-time').value = isEdit && item.lead_time_days != null ? item.lead_time_days : '';
@@ -2438,7 +2443,7 @@ function onItemCategoryChange() {
   }
 }
 function setItemFormReadOnly(readOnly) {
-  ['if-desc', 'if-category', 'if-supplier', 'if-qty', 'if-uom', 'if-unit-cost', 'if-status', 'if-purchase-date', 'if-lead-time', 'if-required-delivery', 'if-actual-delivery', 'if-po-ref', 'if-glass', 'if-glazing', 'if-sorex', 'if-winhaus', 'if-delivery-completion', 'if-delivered-details', 'if-task', 'if-task-done', 'if-task-done-date', 'if-task-assignee', 'if-task-due'].forEach(function (id) {
+  ['if-desc', 'if-category', 'if-supplier', 'if-qty', 'if-uom', 'if-total-cost', 'if-status', 'if-purchase-date', 'if-lead-time', 'if-required-delivery', 'if-actual-delivery', 'if-po-ref', 'if-glass', 'if-glazing', 'if-sorex', 'if-winhaus', 'if-delivery-completion', 'if-delivered-details', 'if-task', 'if-task-done', 'if-task-done-date', 'if-task-assignee', 'if-task-due'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.disabled = readOnly;
   });
@@ -2469,7 +2474,7 @@ function saveItem() {
     supplier_id: document.getElementById('if-supplier').value || null,
     qty: Number(document.getElementById('if-qty').value) || 1,
     uom: document.getElementById('if-uom').value.trim() || null,
-    unit_cost: document.getElementById('if-unit-cost').value === '' ? null : Number(document.getElementById('if-unit-cost').value),
+    total_cost: document.getElementById('if-total-cost').value === '' ? null : Number(document.getElementById('if-total-cost').value),
     item_status: document.getElementById('if-status').value,
     purchase_date: document.getElementById('if-purchase-date').value || null,
     lead_time_days: document.getElementById('if-lead-time').value === '' ? null : parseInt(document.getElementById('if-lead-time').value, 10),
