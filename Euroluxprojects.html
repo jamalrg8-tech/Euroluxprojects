@@ -159,6 +159,14 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
 .quotes-list tbody tr.snap-late { background: #fef2f2; }
 .quotes-list tbody tr.snap-cols th { background: #e9e9e5; color: #333; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; padding: 0.4rem 0.9rem; white-space: nowrap; }
 .rpt-late { color: #b91c1c; font-weight: 700; }
+.quotes-list tbody.snap-block tr td, .quotes-list tbody.snap-block tr th { border-bottom: 1px solid #b5b5b0; }
+.quotes-list tbody.snap-block tr:first-child td { border-top: 2px solid #1a1a1a; }
+.quotes-list tbody.snap-block tr:last-child td, .quotes-list tbody.snap-block tr:last-child th { border-bottom: 2px solid #1a1a1a; }
+.quotes-list tbody.snap-block td:first-child, .quotes-list tbody.snap-block th:first-child { border-left: 2px solid #1a1a1a; }
+.quotes-list tbody.snap-block td:last-child, .quotes-list tbody.snap-block th:last-child { border-right: 2px solid #1a1a1a; }
+.quotes-list tbody.snap-gap td { border: none !important; height: 16px; padding: 0; background: #f7f7f5; }
+.quotes-list tbody.snap-gap { background: #f7f7f5; }
+.quick-hint { font-size: 0.72rem; color: #666; margin-bottom: 8px; }
 .section-card.item-alt { background: #f0f0ee; }
 [id^="item-"], [id^="dw-row-"] { scroll-margin-top: 90px; }
 @keyframes flashbg { 0% { box-shadow: 0 0 0 3px #f59e0b; } 100% { box-shadow: 0 0 0 0 transparent; } }
@@ -354,7 +362,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
     </div>
     <button class="nav-btn" data-route="dashboard" onclick="showDashboard()">Dashboard</button>
     <button class="nav-btn" data-route="projects" onclick="showProjects()">Projects</button>
-    <button class="nav-btn" data-route="snapshot" onclick="showSnapshot()">Snapshot Report</button>
+    <button class="nav-btn" data-route="snapshot" onclick="showSnapshot()">Task Report</button>
     <button class="nav-btn" data-route="drawings" onclick="showDrawings()">Drawings</button>
     <button class="nav-btn" data-route="deliveries" onclick="showDeliveries()">Deliveries</button>
     <button class="nav-btn" data-route="reports" onclick="showReports()">Reports</button>
@@ -368,7 +376,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
     <!-- Views are rendered here by JS -->
   </div>
 
-  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.43</div>
+  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.50</div>
 </div>
 
 <!-- ============================================
@@ -500,6 +508,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
           </select>
         </div>
         <div class="form-group"><label>Purchase Date</label><input type="date" id="if-purchase-date" /></div>
+        <div class="form-group"><label>PO Reference</label><input type="text" id="if-po-ref" /></div>
         <div class="form-group"><label>Estimated Lead Time (days)</label><input type="number" id="if-lead-time" /></div>
         <div class="form-group"><label>Required Delivery Date</label><input type="date" id="if-required-delivery" /></div>
         <div class="form-group"><label>Actual Delivery Date</label><input type="date" id="if-actual-delivery" /></div>
@@ -511,7 +520,6 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
         <div class="form-group"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:normal;"><input type="checkbox" id="if-task-done" style="width:auto;" onchange="onItemTaskDoneChange()" /> Task completed</label></div>
         <div class="form-group"><label>Task Date Completion Date</label><input type="date" id="if-task-done-date" /></div>
         <div class="form-group full" id="if-extra-wrap"><div id="if-extra-tasks"></div><button type="button" class="btn btn-secondary btn-sm" id="if-add-task-btn" onclick="addExtraTaskRow()">+ Add another task</button></div>
-        <div class="form-group"><label>PO Reference</label><input type="text" id="if-po-ref" /></div>
          <div class="form-group" id="if-glass-wrap" style="display:none;"><label>Approved Glass</label><input type="text" id="if-glass" list="glass-list" placeholder="Pick or type a new one" /></div>
          <div class="form-group" id="if-glazing-wrap" style="display:none;"><label>Glazing Type</label><input type="text" id="if-glazing" list="glazing-list" placeholder="Pick or type a new one" /></div>
       </div>
@@ -636,6 +644,27 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
       <button class="btn btn-secondary" onclick="closeDrawingForm()">Cancel</button>
       <button class="btn btn-primary" onclick="saveDrawingForm()">Save Drawing</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="quick-modal" onclick="if(event.target===this)closeQuickAdd()">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header"><h3 id="quick-ttl">Add</h3><button class="btn btn-ghost btn-sm" onclick="closeQuickAdd()">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="quick-hint" id="quick-item"></div>
+      <div id="quick-note-box">
+        <div class="form-group"><label>Date</label><div style="display:flex;gap:6px;"><input type="date" id="qa-note-date" /><button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('qa-note-date').value=todayISO()">Today</button></div></div>
+        <div class="form-group" style="margin-top:10px;"><label>Note</label><textarea id="qa-note-text" rows="4" placeholder="Type the note"></textarea></div>
+      </div>
+      <div id="quick-task-box">
+        <div class="form-group"><label>Task</label><textarea id="qa-task-text" rows="3" placeholder="Type the task"></textarea></div>
+        <div class="form-grid form-grid-2" style="margin-top:10px;">
+          <div class="form-group"><label>Assigned To</label><input type="text" id="qa-task-assignee" list="assignee-list" /></div>
+          <div class="form-group"><label>Due Date</label><input type="date" id="qa-task-due" /></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeQuickAdd()">Cancel</button><button class="btn btn-primary" onclick="saveQuickAdd()">Save</button></div>
   </div>
 </div>
 
@@ -1390,6 +1419,60 @@ function isGlassCategory(categoryId) {
   var c = cache.categories.filter(function (x) { return x.id === categoryId; })[0];
   return !!c && String(c.name).trim().toLowerCase() === 'glass';
 }
+var _quickAdd = null;
+function closeQuickAdd() { document.getElementById('quick-modal').classList.remove('open'); _quickAdd = null; }
+function openQuickAdd(kind, itemId) {
+  var item = (currentProjectItems || []).filter(function (x) { return x.id === itemId; })[0];
+  if (!item) return;
+  _quickAdd = { kind: kind, id: itemId };
+  document.getElementById('quick-ttl').textContent = kind === 'note' ? 'Add Note' : 'Add Task';
+  document.getElementById('quick-item').textContent = item.description;
+  document.getElementById('quick-note-box').style.display = kind === 'note' ? '' : 'none';
+  document.getElementById('quick-task-box').style.display = kind === 'task' ? '' : 'none';
+  document.getElementById('qa-note-date').value = todayISO();
+  document.getElementById('qa-note-text').value = '';
+  document.getElementById('qa-task-text').value = '';
+  document.getElementById('qa-task-assignee').value = '';
+  document.getElementById('qa-task-due').value = '';
+  fillAssigneeList();
+  document.getElementById('quick-modal').classList.add('open');
+  setTimeout(function () { var el = document.getElementById(kind === 'note' ? 'qa-note-text' : 'qa-task-text'); if (el) el.focus(); }, 30);
+}
+function reloadProjectKeepScroll() {
+  var y = window.scrollY || 0, pid = currentProjectId;
+  return Promise.all([getProject(pid), listItems(pid), listDrawings(pid)]).then(function (r) {
+    window.currentProjectDrawings = r[2];
+    renderProjectDetail(r[0], r[1]);
+    try { window.scrollTo(0, y); } catch (e) {}
+  });
+}
+function saveQuickAdd() {
+  if (!_quickAdd) return;
+  var q = _quickAdd, item = (currentProjectItems || []).filter(function (x) { return x.id === q.id; })[0];
+  if (!item) return;
+  var fields;
+  if (q.kind === 'note') {
+    var text = document.getElementById('qa-note-text').value.trim();
+    if (!text) { toast('Type the note first', 'error'); return; }
+    var entries = itemNoteEntries(item).map(function (n) { var o = { date: n.date || '', text: n.text }; if (n.hidden) o.hidden = true; return o; });
+    entries.push({ date: document.getElementById('qa-note-date').value || todayISO(), text: text });
+    fields = { notes_log: entries, notes: notesToPlain(entries) };
+  } else {
+    var tt = document.getElementById('qa-task-text').value.trim();
+    if (!tt) { toast('Type the task first', 'error'); return; }
+    var asg = document.getElementById('qa-task-assignee').value.trim() || null, due = document.getElementById('qa-task-due').value || null;
+    if (!item.task_text && !item.task_assignee) {
+      fields = { task_text: tt, task_assignee: asg, task_due_date: due, task_completed: false, task_completed_date: null };
+    } else {
+      fields = { tasks_extra: (item.tasks_extra || []).concat([{ text: tt, assignee: asg || '', due: due || '', done: false, done_date: '' }]) };
+    }
+  }
+  updateItemRow(q.id, fields).then(function () {
+    toast(q.kind === 'note' ? 'Note added' : 'Task added', 'success');
+    closeQuickAdd();
+    return reloadProjectKeepScroll();
+  }).catch(function (e) { toast('Save failed: ' + e.message, 'error'); });
+}
 function jumpTo(id) {
   var el = document.getElementById(id);
   if (!el) return;
@@ -1454,7 +1537,7 @@ function renderProjectDetail(project, items) {
               '<div><div style="font-weight:700;">' + esc(i.description) + '</div>' +
                 '<div style="margin-top:4px;">' + statusBadge(i.item_status) + (risk.label ? '<span class="risk-flag ' + risk.level + '">' + risk.label + '</span>' : '') + '</div>' +
               '</div>' +
-              '<div style="white-space:nowrap;"><button class="btn btn-ghost btn-sm" onclick="toggleItemHidden(\'' + i.id + '\')">Hide</button> <button class="btn btn-ghost btn-sm" onclick="editItemFormById(\'' + i.id + '\')">Edit</button> <button class="btn btn-ghost btn-sm" style="color:#c00;" onclick="deleteItemConfirm(\'' + i.id + '\',\'' + esc(i.description).replace(/'/g, "\\'") + '\')">Del</button></div>' +
+              '<div style="white-space:nowrap;"><button class="btn btn-ghost btn-sm" onclick="openQuickAdd(\'note\',\'' + i.id + '\')">Add Note</button> <button class="btn btn-ghost btn-sm" onclick="openQuickAdd(\'task\',\'' + i.id + '\')">Add Task</button> <button class="btn btn-ghost btn-sm" onclick="toggleItemHidden(\'' + i.id + '\')">Hide</button> <button class="btn btn-ghost btn-sm" onclick="editItemFormById(\'' + i.id + '\')">Edit</button> <button class="btn btn-ghost btn-sm" style="color:#c00;" onclick="deleteItemConfirm(\'' + i.id + '\',\'' + esc(i.description).replace(/'/g, "\\'") + '\')">Del</button></div>' +
             '</div>' +
             '<div class="detail-grid" style="margin-top:12px;">' +
               '<div class="detail-item"><div class="k">Category</div><div class="v">' + esc(categoryName(i.category_id)) + '</div></div>' +
@@ -1462,10 +1545,10 @@ function renderProjectDetail(project, items) {
               '<div class="detail-item"><div class="k">Quantity</div><div class="v">' + (i.qty != null ? i.qty : '&mdash;') + (i.uom ? ' ' + esc(i.uom) : '') + '</div></div>' +
               '<div class="detail-item"><div class="k">Total Cost</div><div class="v">' + (i.total_cost != null ? fmt(i.total_cost) : '&mdash;') + '</div></div>' +
               '<div class="detail-item"><div class="k">Purchase Date</div><div class="v">' + fmtDate(i.purchase_date) + '</div></div>' +
+              '<div class="detail-item"><div class="k">PO Reference</div><div class="v">' + (esc(i.po_ref) || '&mdash;') + '</div></div>' +
               '<div class="detail-item"><div class="k">Lead Time</div><div class="v">' + (i.lead_time_days != null ? i.lead_time_days + ' days' : '&mdash;') + '</div></div>' +
               '<div class="detail-item"><div class="k">Required Delivery</div><div class="v">' + fmtDate(i.required_delivery) + '</div></div>' +
               '<div class="detail-item"><div class="k">Actual Delivery</div><div class="v">' + fmtDate(i.actual_delivery) + '</div></div>' +
-              '<div class="detail-item"><div class="k">PO Reference</div><div class="v">' + (esc(i.po_ref) || '&mdash;') + '</div></div>' +
               (isGlassCategory(i.category_id) ? '<div class="detail-item"><div class="k">Approved Glass</div><div class="v">' + (esc(i.approved_glass) || '&mdash;') + '</div></div>' +
               '<div class="detail-item"><div class="k">Glazing Type</div><div class="v">' + (esc(i.glazing_type) || '&mdash;') + '</div></div>' : '') +
               (i.delivery_completion ? '<div class="detail-item"><div class="k">Delivery Completed</div><div class="v">' + esc(i.delivery_completion) + '</div></div>' : '') +
@@ -2639,7 +2722,7 @@ function exportSnapshotPDF() {
   if (!pdfReady || !autoTableReady) { toast('PDF export library failed to load \u2014 check your connection and try again', 'error'); return; }
   try {
     var doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-    doc.setFontSize(14); doc.text('Eurolux Snapshot Report' + (snapFilter.attention ? ' - Tasks Needing Attention' : ''), 28, 30);
+    doc.setFontSize(14); doc.text('Eurolux Task Report' + (snapFilter.attention ? ' - Tasks Needing Attention' : ''), 28, 30);
     doc.setFontSize(8.5); doc.text('Generated ' + fmtDatePlain(todayISO()) + '  \u00b7  ' + blocks.length + ' project(s)  \u00b7  open tasks due within ' + TASK_ALERT_DAYS + ' days or overdue are shown in red', 28, 44);
     var y = 58;
     blocks.forEach(function (b) {
@@ -2667,7 +2750,7 @@ function exportSnapshotPDF() {
       });
       y = doc.lastAutoTable.finalY + 12;
     });
-    doc.save('eurolux-snapshot-report.pdf');
+    doc.save('eurolux-task-report.pdf');
   } catch (e) { toast('PDF export failed: ' + e.message, 'error'); }
 }
 function renderSnapshot() {
@@ -2677,7 +2760,7 @@ function renderSnapshot() {
   blocks.forEach(function (bl) {
     var p = bl.project, its = bl.items;
     its.forEach(function (i) { if (taskIsUrgent(i)) urgentCount++; });
-    body += '<tr class="snap-proj">' +
+    body += '<tbody class="snap-block"><tr class="snap-proj">' +
       '<td colspan="2"><span class="link-btn" style="font-weight:700;" onclick="showProjectDetail(\'' + p.id + '\')">' + esc(p.site_name) + '</span>' + (p.ref ? '<div class="muted" style="font-size:0.7rem;">' + esc(p.ref) + '</div>' : '') + '</td>' +
       '<td class="muted" style="font-size:0.72rem;">Install date</td>' +
       '<td>' + (report ? '<strong>' + fmtDate(p.install_date) + '</strong>' : '<input type="date" class="cell-input" data-pid="' + p.id + '" value="' + esc(p.install_date || '') + '" onchange="snapProjectInstallEdit(this)" />') + '</td>' +
@@ -2685,11 +2768,12 @@ function renderSnapshot() {
     body += snapColsRowHtml();
     if (!its.length) body += '<tr><td></td><td></td><td colspan="7" class="muted">No products yet</td></tr>';
     body += its.map(report ? snapItemReportRowHtml : snapItemRowHtml).join('');
+    body += '</tbody><tbody class="snap-gap"><tr><td colspan="9"></td></tr></tbody>';
   });
-  var table = body ? '<table class="quotes-list static"><tbody>' + body + '</tbody></table>'
+  var table = body ? '<table class="quotes-list static">' + body.replace(/<\/tbody><tbody class="snap-gap"><tr><td colspan="9"><\/td><\/tr><\/tbody>$/, '</tbody>') + '</table>'
     : '<div class="empty-state"><div class="icon">&#128203;</div><h3>Nothing to show</h3></div>';
   render(
-    '<div class="dashboard-header"><div>' + backButtonHtml() + '<h1>Snapshot Report</h1><p>' + (report ? 'Read-only report view &mdash; print it or download it as a PDF. ' : 'Edit here and it saves to the main screens. ') + 'Tasks due within ' + TASK_ALERT_DAYS + ' days (or overdue) show in red.' + (snapFilter.attention ? ' <strong class="snap-flag">Showing only the ' + urgentCount + ' task(s) needing attention.</strong> <button class="link-btn" onclick="setSnapAttention(false)">Show all</button>' : (urgentCount ? ' <button class="link-btn snap-flag" style="text-decoration:underline;" title="Click to list only these tasks" onclick="setSnapAttention(true)">' + urgentCount + ' task(s) need attention &mdash; click to view</button>' : '')) + '</p></div>' +
+    '<div class="dashboard-header"><div>' + backButtonHtml() + '<h1>Task Report</h1><p>' + (report ? 'Read-only report view &mdash; print it or download it as a PDF. ' : 'Edit here and it saves to the main screens. ') + 'Tasks due within ' + TASK_ALERT_DAYS + ' days (or overdue) show in red.' + (snapFilter.attention ? ' <strong class="snap-flag">Showing only the ' + urgentCount + ' task(s) needing attention.</strong> <button class="link-btn" onclick="setSnapAttention(false)">Show all</button>' : (urgentCount ? ' <button class="link-btn snap-flag" style="text-decoration:underline;" title="Click to list only these tasks" onclick="setSnapAttention(true)">' + urgentCount + ' task(s) need attention &mdash; click to view</button>' : '')) + '</p></div>' +
       '<div class="search-wrap">' +
         '<div class="mode-toggle"><button class="' + (report ? '' : 'on') + '" onclick="setSnapMode(\'edit\')">Edit view</button><button class="' + (report ? 'on' : '') + '" onclick="setSnapMode(\'report\')">Report view</button></div>' +
         '<button class="btn btn-primary btn-sm" onclick="exportSnapshotPDF()">Download PDF</button>' +
@@ -2774,7 +2858,7 @@ function exportSnapshotCSV() {
       rows.push({ Project: p.site_name, InstallDate: p.install_date, Product: i.description, DeliveryDate: i.required_delivery, Status: deliveryState(i), Task: i.task_text, TaskCompleted: i.task_completed ? 'Yes' : 'No', CompletedOn: i.task_completed_date, AssignedTo: i.task_assignee, TaskDue: i.task_due_date });
     });
   });
-  downloadCSV('eurolux-snapshot.csv', rows);
+  downloadCSV('eurolux-task-report.csv', rows);
 }
 
 // ============================================
@@ -2800,29 +2884,42 @@ function applyDeliveryFilters(items) {
     return true;
   }).sort(function (a, b) { return (a.required_delivery || '').localeCompare(b.required_delivery || ''); });
 }
+function deliveryRowHtml(i) {
+  var risk = itemRisk(i);
+  var rowStyle = risk.level === 'risk' ? 'background:#fef3f2;' : risk.level === 'soon' ? 'background:#fffaeb;' : '';
+  return '<tr id="dr-' + i.id + '" style="' + rowStyle + '">' +
+    '<td><input type="date" class="cell-input" data-id="' + i.id + '" data-f="required_delivery" value="' + esc(i.required_delivery || '') + '" onchange="deliveryEdit(this)" /></td>' +
+    '<td><input type="date" class="cell-input" id="dd-' + i.id + '" data-id="' + i.id + '" data-f="actual_delivery" value="' + esc(i.actual_delivery || '') + '" onchange="deliveryEdit(this)" /></td>' +
+    '<td>' + esc(i.description) + (risk.label ? '<span class="risk-flag ' + risk.level + '">' + risk.label + '</span>' : '') + '</td>' +
+    '<td>' + (esc(i.supplier_name) || '&mdash;') + '</td>' +
+    '<td>' + (esc(i.category_name) || '&mdash;') + '</td>' +
+    '<td><select class="cell-input" id="ds-' + i.id + '" data-id="' + i.id + '" onchange="deliveryStatusEdit(this)">' + ITEM_STATUSES.map(function (st) { return '<option' + (st === i.item_status ? ' selected' : '') + '>' + esc(st) + '</option>'; }).join('') + '</select></td>' +
+    '<td><select class="cell-input" id="dc-' + i.id + '" data-id="' + i.id + '" data-f="delivery_completion" onchange="deliveryEdit(this)"><option value="">&mdash;</option><option' + (i.delivery_completion === 'Full' ? ' selected' : '') + '>Full</option><option' + (i.delivery_completion === 'Partial' ? ' selected' : '') + '>Partial</option></select></td>' +
+    '<td><input type="text" class="cell-input" style="min-width:170px;" data-id="' + i.id + '" data-f="delivered_details" value="' + esc(i.delivered_details || '') + '" placeholder="What was delivered" onchange="deliveryEdit(this)" /></td>' +
+    '</tr>';
+}
 function renderDeliveries() {
   var rows = applyDeliveryFilters(window._allItemsCache || []);
+  // group by project, projects ordered by their earliest required delivery
+  var groups = {}, order = [];
+  rows.forEach(function (i) {
+    if (!groups[i.project_id]) { groups[i.project_id] = { id: i.project_id, name: i.site_name, ref: i.project_ref, items: [] }; order.push(i.project_id); }
+    groups[i.project_id].items.push(i);
+  });
+  var cols = '<tr class="snap-cols"><th>Required</th><th>Date Delivered</th><th>Item</th><th>Supplier</th><th>Category</th><th>Status</th><th>Delivery</th><th>What Was Delivered</th></tr>';
   var tableHtml = rows.length ? (
-    '<table class="quotes-list static"><thead><tr><th>Required</th><th>Date Delivered</th><th>Item</th><th>Project</th><th>Supplier</th><th>Category</th><th>Status</th><th>Delivery</th><th>What Was Delivered</th></tr></thead><tbody>' +
-    rows.map(function (i) {
-      var risk = itemRisk(i);
-      var rowStyle = risk.level === 'risk' ? 'background:#fef3f2;' : risk.level === 'soon' ? 'background:#fffaeb;' : '';
-      return '<tr id="dr-' + i.id + '" style="' + rowStyle + '">' +
-        '<td><input type="date" class="cell-input" data-id="' + i.id + '" data-f="required_delivery" value="' + esc(i.required_delivery || '') + '" onchange="deliveryEdit(this)" /></td>' +
-        '<td><input type="date" class="cell-input" id="dd-' + i.id + '" data-id="' + i.id + '" data-f="actual_delivery" value="' + esc(i.actual_delivery || '') + '" onchange="deliveryEdit(this)" /></td>' +
-        '<td>' + esc(i.description) + (risk.label ? '<span class="risk-flag ' + risk.level + '">' + risk.label + '</span>' : '') + '</td>' +
-        '<td><span class="link-btn" onclick="showProjectDetail(\'' + i.project_id + '\')">' + esc(i.site_name) + '</span></td>' +
-        '<td>' + (esc(i.supplier_name) || '&mdash;') + '</td>' +
-        '<td>' + (esc(i.category_name) || '&mdash;') + '</td>' +
-        '<td><select class="cell-input" id="ds-' + i.id + '" data-id="' + i.id + '" onchange="deliveryStatusEdit(this)">' + ITEM_STATUSES.map(function (st) { return '<option' + (st === i.item_status ? ' selected' : '') + '>' + esc(st) + '</option>'; }).join('') + '</select></td>' +
-        '<td><select class="cell-input" id="dc-' + i.id + '" data-id="' + i.id + '" data-f="delivery_completion" onchange="deliveryEdit(this)"><option value="">&mdash;</option><option' + (i.delivery_completion === 'Full' ? ' selected' : '') + '>Full</option><option' + (i.delivery_completion === 'Partial' ? ' selected' : '') + '>Partial</option></select></td>' +
-        '<td><input type="text" class="cell-input" style="min-width:170px;" data-id="' + i.id + '" data-f="delivered_details" value="' + esc(i.delivered_details || '') + '" placeholder="What was delivered" onchange="deliveryEdit(this)" /></td>' +
-        '</tr>';
-    }).join('') + '</tbody></table>'
+    '<table class="quotes-list static">' +
+    order.map(function (pid) {
+      var g = groups[pid];
+      return '<tbody class="snap-block"><tr class="snap-proj"><td colspan="8"><span class="link-btn" style="font-weight:700;" onclick="showProjectDetail(\'' + g.id + '\')">' + esc(g.name) + '</span>' +
+        (g.ref ? ' <span class="muted" style="font-size:0.72rem;margin-left:6px;">' + esc(g.ref) + '</span>' : '') +
+        ' <span class="muted" style="font-size:0.72rem;margin-left:8px;">' + g.items.length + ' item(s)</span></td></tr>' + cols +
+        g.items.map(deliveryRowHtml).join('') + '</tbody><tbody class="snap-gap"><tr><td colspan="8"></td></tr></tbody>';
+    }).join('') + '</table>'
   ) : '<div class="empty-state"><div class="icon">&#128230;</div><h3>No deliveries match</h3></div>';
 
   render(
-    '<div class="dashboard-header"><div>' + backButtonHtml() + '<h1>Delivery Schedule</h1><p>' + rows.length + ' item(s) &middot; edit any date, status or delivery detail directly &mdash; changes save automatically</p></div>' +
+    '<div class="dashboard-header"><div>' + backButtonHtml() + '<h1>Delivery Schedule</h1><p>' + rows.length + ' item(s) in ' + order.length + ' project(s) &middot; edit any date, status or delivery detail directly &mdash; changes save automatically</p></div>' +
       '<div class="search-wrap"><button class="btn btn-secondary btn-sm" onclick="exportDeliveriesCSV()">Export CSV</button></div></div>' +
     '<div class="search-wrap" style="margin-bottom:1rem;">' +
       '<input type="date" class="date-filter" id="df-from" value="' + deliveriesFilter.from + '" onchange="onDeliveryFilterChange()" />' +
