@@ -187,6 +187,10 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
 .dw-chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #bbb; border-radius: 14px; padding: 3px 10px; font-size: 0.74rem; cursor: pointer; margin: 2px; background: #fff; user-select: none; }
 .dw-chip.on { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
 .dw-shared { background: #f4f7fb; border: 1px solid #d5e1f0; border-radius: 6px; padding: 10px 12px; margin-top: 10px; }
+.dual-box { grid-column: 1 / -1; background: #fdeaea; border: 2px solid #d32f2f; border-radius: 6px; padding: 8px 10px; }
+.dual-box label { color: #b71c1c; font-weight: 800; }
+.dual-box input { border: 2px solid #d32f2f !important; background: #fff5f5; font-weight: 700; color: #b71c1c; }
+.dual-badge { display: inline-block; background: #d32f2f; color: #fff; font-weight: 800; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; letter-spacing: .4px; }
 .dw-shared .hd { font-size: 0.72rem; font-weight: 700; color: #1f4e8c; margin-bottom: 6px; }
 .dw-unlinked { color: #b45309; font-weight: 700; font-size: 0.7rem; }
 .item-collapsed { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0.6rem 1rem !important; margin-bottom: 10px; background: #fafafa; }
@@ -385,7 +389,7 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
     <!-- Views are rendered here by JS -->
   </div>
 
-  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.60</div>
+  <div class="app-footer">Eurolux Projects and Procurement Management system &mdash; Developed with love by Uncle Ed, Version 4.62</div>
 </div>
 
 <!-- ============================================
@@ -426,7 +430,12 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
         </div>
         <div class="form-group"><label>Installation Date</label><input type="date" id="pf-install-date" onchange="onInstallDateChange()" /><div class="muted" id="pf-install-hint" style="font-size:0.68rem;margin-top:2px;"></div></div>
         <div class="form-group"><label>Target Finish Date</label><input type="date" id="pf-finish-date" /></div>
-        <div class="form-group"><label>Approved RAL Color</label><input type="text" id="pf-ral" placeholder="e.g. RAL 9016M" /></div>
+        <div class="form-group"><label>Dual Colour?</label><select id="pf-dual" onchange="onPfDualChange()"><option value="">-- Select --</option><option value="No">No</option><option value="Yes">Yes</option></select></div>
+        <div class="form-group" id="pf-ral-wrap"><label>Approved RAL Color</label><input type="text" id="pf-ral" placeholder="e.g. RAL 9016M" /></div>
+        <div class="form-group dual-box" id="pf-dual-wrap" style="display:none;"><div class="form-grid form-grid-2">
+          <div class="form-group"><label>Inside RAL Colour</label><input type="text" id="pf-ral-in" placeholder="e.g. RAL 9016M" /></div>
+          <div class="form-group"><label>Outside RAL Colour</label><input type="text" id="pf-ral-out" placeholder="e.g. RAL 7016M" /></div>
+        </div></div>
         <div class="form-group"><label>Approved Glass</label><input type="text" id="pf-glass" list="pf-glass-list" placeholder="Pick or type a new one" /></div>
         <div class="form-group"><label>Design Approved Date</label><input type="date" id="pf-design-date" onchange="onDesignDateChange()" /></div>
         <div class="form-group"><label id="pf-contact-name-lbl">Site Contact Name</label><input type="text" id="pf-contact-name" /></div>
@@ -624,7 +633,12 @@ html, body { height: 100%; font-family: var(--font-sans); color: var(--dark); fo
         <div class="form-grid form-grid-2">
           <div class="form-group"><label>Project No.</label><input type="text" id="df-ref" disabled /></div>
           <div class="form-group"><label>Client</label><input type="text" id="df-client" disabled /></div>
-          <div class="form-group"><label>RAL Colour</label><input type="text" id="df-ral" placeholder="e.g. RAL 9016M" /></div>
+          <div class="form-group"><label>Dual Colour?</label><select id="df-dual" onchange="onDualChange()"><option value="">-- Select --</option><option value="No">No</option><option value="Yes">Yes</option></select></div>
+          <div class="form-group" id="df-ral-wrap"><label>RAL Colour</label><input type="text" id="df-ral" placeholder="e.g. RAL 9016M" /></div>
+          <div class="form-group dual-box" id="df-dual-wrap" style="display:none;"><div class="form-grid form-grid-2">
+            <div class="form-group"><label>Inside RAL Colour</label><input type="text" id="df-ral-in" placeholder="e.g. RAL 9016M" /></div>
+            <div class="form-group"><label>Outside RAL Colour</label><input type="text" id="df-ral-out" placeholder="e.g. RAL 7016M" /></div>
+          </div></div>
           <div class="form-group"><label>Approved Glass</label><input type="text" id="df-glass" list="pf-glass-list" /></div>
           <div class="form-group"><label>Installation Date</label><input type="date" id="df-install" /><div class="muted" id="df-install-hint" style="font-size:0.68rem;margin-top:3px;"></div></div>
         </div>
@@ -1593,7 +1607,7 @@ function renderProjectDetail(project, items) {
         '<div class="detail-item"><div class="k">Finish Date</div><div class="v">' + fmtDate(project.finish_date) + '</div></div>' +
         '<div class="detail-item"><div class="k">Project Value</div><div class="v">' + (project.project_value ? fmt(project.project_value) : '&mdash;') + '</div></div>' +
         '<div class="detail-item"><div class="k">Procurement Total</div><div class="v">' + fmt(totalCost) + '</div></div>' +
-        '<div class="detail-item"><div class="k">Approved RAL Color</div><div class="v">' + (esc(project.approved_ral_color) || '&mdash;') + '</div></div>' +
+        '<div class="detail-item"><div class="k">Approved RAL Color</div><div class="v">' + (project.dual_colour === 'Yes' ? '<span class="dual-badge">DUAL COLOUR</span> ' : '') + (esc(project.approved_ral_color) || '&mdash;') + '</div></div>' +
         '<div class="detail-item"><div class="k">Approved Glass</div><div class="v">' + (esc(project.approved_glass) || '&mdash;') + '</div></div>' +
         '<div class="detail-item"><div class="k">Design Approved Date</div><div class="v">' + fmtDate(project.design_signoff_date) + '</div></div>' +
         '<div class="detail-item"><div class="k">Site Contact Name</div><div class="v">' + (esc(project.contact_name) || '&mdash;') + '</div></div>' +
@@ -1655,6 +1669,7 @@ function dwInfo(d) {
     name: p ? p.site_name : (d.legacy_project_name || ''),
     client: p ? (p.client || '') : (d.legacy_client || ''),
     ral: p ? (p.approved_ral_color || '') : (d.legacy_frame_color || ''),
+    dual: !!(p && p.dual_colour === 'Yes'), ralIn: p ? (p.ral_inside || '') : '', ralOut: p ? (p.ral_outside || '') : '',
     glass: p ? (p.approved_glass || '') : (d.legacy_glass_spec || ''),
     install: p ? (p.install_date || '') : (d.legacy_install_date || '')
   };
@@ -1728,7 +1743,7 @@ function dwTableHtml() {
         '<td class="muted">' + fmtDate(d.submission_date) + '</td>' +
         '<td class="muted">' + fmtDate(d.approval_date) + '</td>' +
         '<td class="muted">' + (esc(d.frame_suppliers) || '&mdash;') + '</td>' +
-        '<td class="muted">' + (esc(n.ral) || '&mdash;') + '</td>' +
+        '<td class="muted">' + (n.dual ? '<span class="dual-badge">DUAL</span> ' : '') + (esc(n.ral) || '&mdash;') + '</td>' +
         '<td style="white-space:nowrap;" onclick="event.stopPropagation()"><button class="btn btn-ghost btn-sm" onclick="openDrawingForm(\'' + d.id + '\')">' + (n.linked ? 'Edit' : 'Link') + '</button></td>' +
       '</tr>';
     }).join('') + '</tbody></table></div>';
@@ -1751,7 +1766,7 @@ function viewDrawing(id) {
       dwKv('Designer', esc(d.designer) || '&mdash;') + dwKv('Revision', esc(d.rev_no) || '&mdash;') +
       dwKv('Submitted', fmtDate(d.submission_date)) + dwKv('Approved', fmtDate(d.approval_date)) + dwKv('Installation Date', fmtDate(n.install)) + '</div>' +
     '<div class="sec-title" style="font-weight:700;margin:14px 0 6px;">Frame &amp; Glass Specifications</div><div class="detail-grid">' +
-      dwKv('RAL Colour', esc(n.ral) || '&mdash;') + dwKv('Approved Glass', esc(n.glass) || '&mdash;') + dwKv('Flyscreen', esc(d.flyscreen_spec) || '&mdash;') +
+      (n.dual ? '<div class="dual-box" style="grid-column:1/-1;"><span class="dual-badge">DUAL COLOUR</span> <b style="color:#b71c1c;">Inside: ' + (esc(n.ralIn) || '&mdash;') + ' &nbsp;|&nbsp; Outside: ' + (esc(n.ralOut) || '&mdash;') + '</b></div>' : dwKv('RAL Colour', esc(n.ral) || '&mdash;')) + dwKv('Approved Glass', esc(n.glass) || '&mdash;') + dwKv('Flyscreen', esc(d.flyscreen_spec) || '&mdash;') +
       dwKv('Box Section', esc(d.box_section) || '&mdash;') +
       dwKv('Flat Bars', d.flat_bars_required === 'Yes' ? 'Yes (' + esc(d.flat_bar_width || '-') + ' x ' + esc(d.flat_bar_thickness || '-') + ')' : (esc(d.flat_bars_required) || '&mdash;')) + '</div>' +
     '<div class="sec-title" style="font-weight:700;margin:14px 0 6px;">Production &amp; Delivery</div><div class="detail-grid">' +
@@ -1836,7 +1851,16 @@ function onDrawingProjectChange(initial) {
   document.getElementById('df-ral').value = p ? (p.approved_ral_color || (d && !d.project_id ? d.legacy_frame_color || '' : '')) : (d ? (d.legacy_frame_color || '') : '');
   document.getElementById('df-glass').value = p ? (p.approved_glass || (d && !d.project_id ? d.legacy_glass_spec || '' : '')) : (d ? (d.legacy_glass_spec || '') : '');
   document.getElementById('df-install').value = p ? (p.install_date || (d && !d.project_id ? d.legacy_install_date || '' : '')) : (d ? (d.legacy_install_date || '') : '');
+  document.getElementById('df-dual').value = p ? (p.dual_colour || '') : '';
+  document.getElementById('df-ral-in').value = p ? (p.ral_inside || '') : '';
+  document.getElementById('df-ral-out').value = p ? (p.ral_outside || '') : '';
+  onDualChange();
   dwInstallHint();
+}
+function onDualChange() {
+  var y = document.getElementById('df-dual').value === 'Yes';
+  document.getElementById('df-dual-wrap').style.display = y ? '' : 'none';
+  document.getElementById('df-ral-wrap').style.display = y ? 'none' : '';
 }
 function dwInstallHint() {
   var a = document.getElementById('df-approved').value, cur = document.getElementById('df-install').value;
@@ -1908,6 +1932,16 @@ function saveDrawingForm() {
   var shared = {};
   var ral = g('df-ral').trim() || null, glass = g('df-glass').trim() || null, inst = g('df-install') || null;
   if (proj) {
+    var dual = g('df-dual'), rin = g('df-ral-in').trim(), rout = g('df-ral-out').trim();
+    if (dual === 'Yes') {
+      if (!rin || !rout) { toast('Enter both the Inside and Outside RAL Colour', 'error'); return; }
+      ral = 'Inside: ' + rin + ' / Outside: ' + rout;
+    }
+    if (dual && dual !== (proj.dual_colour || '')) shared.dual_colour = dual;
+    if (dual === 'Yes') {
+      if (rin !== (proj.ral_inside || '')) shared.ral_inside = rin;
+      if (rout !== (proj.ral_outside || '')) shared.ral_outside = rout;
+    }
     if (ral && ral !== (proj.approved_ral_color || null)) shared.approved_ral_color = ral;
     if (glass && glass !== (proj.approved_glass || null)) shared.approved_glass = glass;
     if (inst && inst !== (proj.install_date || null)) shared.install_date = inst;
@@ -2361,6 +2395,10 @@ function openProjectForm(project) {
   document.getElementById('pf-install-date').value = isEdit ? (project.install_date || '') : '';
   document.getElementById('pf-finish-date').value = isEdit ? (project.finish_date || '') : '';
   document.getElementById('pf-ral').value = isEdit ? (project.approved_ral_color || '') : '';
+  document.getElementById('pf-dual').value = isEdit ? (project.dual_colour || '') : '';
+  document.getElementById('pf-ral-in').value = isEdit ? (project.ral_inside || '') : '';
+  document.getElementById('pf-ral-out').value = isEdit ? (project.ral_outside || '') : '';
+  onPfDualChange();
   document.getElementById('pf-glass').value = isEdit ? (project.approved_glass || '') : '';
   document.getElementById('pf-glass-list').innerHTML = cache.glassTypes.map(function (g) { return '<option value="' + esc(g.name) + '">'; }).join('');
   document.getElementById('pf-design-date').value = isEdit ? (project.design_signoff_date || '') : '';
@@ -2413,6 +2451,14 @@ function saveProject() {
     revised_drawing_submission_date: document.getElementById('pf-revised-drawing-date').value || null
   };
   payload.notes = notesToPlain(payload.notes_log);
+  var pfDual = document.getElementById('pf-dual').value, pfIn = document.getElementById('pf-ral-in').value.trim(), pfOut = document.getElementById('pf-ral-out').value.trim();
+  if (pfDual === 'Yes') {
+    if (!pfIn || !pfOut) { toast('Enter both the Inside and Outside RAL Colour', 'error'); return; }
+    payload.approved_ral_color = 'Inside: ' + pfIn + ' / Outside: ' + pfOut;
+    payload.dual_colour = 'Yes'; payload.ral_inside = pfIn; payload.ral_outside = pfOut;
+  } else if (pfDual === 'No' || window._editingProjectId) {
+    payload.dual_colour = pfDual || null; payload.ral_inside = null; payload.ral_outside = null;
+  }
   var isEdit = !!window._editingProjectId;
   var p = isEdit ? updateProjectRow(window._editingProjectId, payload) : createProject(payload);
   p.then(function (row) {
@@ -2426,6 +2472,11 @@ function saveProject() {
     }
     if (isEdit) { showProjectDetail(window._editingProjectId); } else { showProjectDetail(row.id); }
   }).catch(function (e) { toast('Save failed: ' + e.message, 'error'); });
+}
+function onPfDualChange() {
+  var y = document.getElementById('pf-dual').value === 'Yes';
+  document.getElementById('pf-dual-wrap').style.display = y ? '' : 'none';
+  document.getElementById('pf-ral-wrap').style.display = y ? 'none' : '';
 }
 function deleteProjectFromForm() {
   if (!window._editingProjectId) return;
